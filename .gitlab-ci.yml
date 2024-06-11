@@ -7,7 +7,6 @@ image: golang:1.21
       dpkg -i docker-cli.deb && \
       rm docker-cli.deb
 
-
 variables:
   MAJOR_VERSION: "0"
   MINOR_VERSION: "1"
