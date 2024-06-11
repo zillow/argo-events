@@ -38,6 +38,6 @@ stages:
 build:events:
   extends: .build_templatized_docker_image
   variables:
-    ARTIFACT_NAME: "eventsource"
+    ARTIFACT_NAME: "argo-events"
     CONTEXT: "./"
   stage: build:images
