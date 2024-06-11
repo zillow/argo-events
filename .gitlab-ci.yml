@@ -6,6 +6,8 @@ image: golang:1.21
       wget -O docker-cli.deb https://download.docker.com/linux/debian/dists/bullseye/pool/stable/amd64/docker-ce-cli_20.10.18~3-0~debian-bullseye_amd64.deb && \
       dpkg -i docker-cli.deb && \
       rm docker-cli.deb
+    - go get github.com/golang/dep/cmd/dep
+    - dep ensure
 
 
 variables:
