@@ -7,7 +7,7 @@ image: golang:1.21
       dpkg -i docker-cli.deb && \
       rm docker-cli.deb
     - go get github.com/golang/dep/cmd/dep
-    - $GOPATH/bin/dep ensure
+    - $(go env GOPATH)/src/github.com/golang/dep ensure
 
 
 variables:
