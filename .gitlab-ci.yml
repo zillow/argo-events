@@ -1,3 +1,14 @@
+image: golang:1.22
+
+.install_go:
+  before_script:
+    - go get -u github.com/golang/dep/cmd/dep
+    - mkdir -p $GOPATH/src
+    - cd $GOPATH/src
+    - ln -s $CI_PROJECT_DIR
+    - cd $CI_PROJECT_NAME
+    - dep ensure  
+
 variables:
   MAJOR_VERSION: "0"
   MINOR_VERSION: "1"
@@ -5,6 +16,7 @@ variables:
   TEAM_NAME: "ai-platform"
 .build_templatized_docker_image:
   before_script:
+    - !reference [.install_go, before_script]
     # Turn on debug logging to output commands with vars to make local testing easier.
     - set -x
     # Inject org & team names to conform to AIP naming conventions that make it possible to set
