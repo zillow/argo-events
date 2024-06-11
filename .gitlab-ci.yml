@@ -16,7 +16,6 @@ variables:
   TEAM_NAME: "ai-platform"
 .build_templatized_docker_image:
   before_script:
-    - !reference [.install_go, before_script]
     # Turn on debug logging to output commands with vars to make local testing easier.
     - set -x
     # Inject org & team names to conform to AIP naming conventions that make it possible to set
