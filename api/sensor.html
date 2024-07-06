@@ -3453,6 +3453,21 @@ Defaults to false. Trigger execution will use at-most-once semantics.
 If set to true, Trigger execution will switch to at-least-once semantics.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>dlqTrigger</code></br>
+<em>
+<a href="#argoproj.io/v1alpha1.Trigger">
+Trigger
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Invoke a dead letter queue trigger if the trigger execution failed after
+the retries, if set, are exhausted and if atLeastOnce is set to true.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="argoproj.io/v1alpha1.TriggerParameter">TriggerParameter
