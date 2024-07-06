@@ -234,6 +234,8 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 						if dlqErr != nil {
 							triggerLogger.Errorf("failed to trigger dlqTrigger, %v for error %v", err, dlqErr)
 						}
+					} else {
+						triggerLogger.Warnf("dlqTrigger not setup, %v", err)
 					}
 				}
 			}
