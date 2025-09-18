@@ -330,6 +330,9 @@ type Trigger struct {
 	// Retry strategy, defaults to no retry
 	// +optional
 	RetryStrategy *apicommon.Backoff `json:"retryStrategy,omitempty" protobuf:"bytes,4,opt,name=retryStrategy"`
+	// Resource constraint retry strategy (for quota, limits, etc.), defaults to retryStrategy
+	// +optional
+	ResourceRetryStrategy *apicommon.Backoff `json:"resourceRetryStrategy,omitempty" protobuf:"bytes,8,opt,name=resourceRetryStrategy"`
 	// Rate limit, default unit is Second
 	// +optional
 	RateLimit *RateLimit `json:"rateLimit,omitempty" protobuf:"bytes,5,opt,name=rateLimit"`

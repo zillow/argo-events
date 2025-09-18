@@ -212,7 +212,34 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 			}
 
 			actionFunc := func(events map[string]cloudevents.Event) {
-				sensorCtx.triggerActions(ctx, sensor, events, trigger)
+				retryStrategy := trigger.RetryStrategy
+				if retryStrategy == nil {
+					retryStrategy = &apicommon.Backoff{Steps: 1}
+				}
+				resourceRetryStrategy := trigger.ResourceRetryStrategy
+				err := common.DoWithResourceAwareRetry(retryStrategy, resourceRetryStrategy, func() error {
+					return sensorCtx.triggerActions(ctx, sensor, events, trigger)
+				})
+				if err != nil {
+					triggerLogger.Warnf("failed to trigger actions, %v", err)
+					sensorCtx.metrics.ActionRetriesFailed(sensor.Name, trigger.Template.Name)
+					if trigger.DlqTrigger != nil {
+						dlqRetryStrategy := trigger.DlqTrigger.RetryStrategy
+						if dlqRetryStrategy == nil {
+							dlqRetryStrategy = &apicommon.Backoff{Steps: 1}
+						}
+
+						triggerLogger.Debugf("invoking dlqTrigger")
+						dlqErr := common.DoWithRetry(dlqRetryStrategy, func() error {
+							return sensorCtx.triggerActions(ctx, sensor, events, *trigger.DlqTrigger)
+						})
+
+						if dlqErr != nil {
+							triggerLogger.Errorf("failed to trigger dlqTrigger, %v", dlqErr)
+							sensorCtx.metrics.ActionRetriesFailed(sensor.Name, trigger.DlqTrigger.Template.Name)
+						}
+					}
+				}
 			}
 
 			var subLock uint32
