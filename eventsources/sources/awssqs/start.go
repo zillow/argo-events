@@ -26,6 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	sqslib "github.com/aws/aws-sdk-go/service/sqs"
+	nats "github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 
 	"github.com/argoproj/argo-events/common/logging"
@@ -44,6 +45,8 @@ type EventListener struct {
 	EventName       string
 	SQSEventSource  v1alpha1.SQSEventSource
 	Metrics         *metrics.Metrics
+	// JetStream context for capacity checking (set during StartListening)
+	JSContext nats.JetStreamContext
 }
 
 // GetEventSourceName returns name of event source
@@ -59,6 +62,53 @@ func (el *EventListener) GetEventName() string {
 // GetEventSourceType return type of event server
 func (el *EventListener) GetEventSourceType() apicommon.EventSourceType {
 	return apicommon.SQSEvent
+}
+
+// SetJetStreamContext sets the JetStream context for capacity checking
+func (el *EventListener) SetJetStreamContext(jsContext nats.JetStreamContext) {
+	el.JSContext = jsContext
+}
+
+// isEventBusFull checks if the event bus is at capacity or unavailable
+func (el *EventListener) isEventBusFull(log *zap.SugaredLogger) bool {
+	if el.JSContext == nil {
+		// If no JetStream context, treat as unavailable to prevent message loss
+		log.Warnw("JetStream context not available, treating as unavailable to prevent message loss",
+			zap.String("eventSource", el.GetEventSourceName()),
+			zap.String("eventName", el.GetEventName()))
+		return true
+	}
+
+	streamInfo, err := el.JSContext.StreamInfo("default")
+	if err != nil {
+		// If we can't check capacity, treat as unavailable to prevent message loss
+		log.Warnw("Failed to get stream info, treating as unavailable to prevent message loss",
+			zap.String("eventSource", el.GetEventSourceName()),
+			zap.String("eventName", el.GetEventName()),
+			zap.Error(err))
+		return true
+	}
+
+	// Check if stream is at capacity based on MaxMsgs
+	if streamInfo.Config.MaxMsgs > 0 && streamInfo.State.Msgs >= uint64(streamInfo.Config.MaxMsgs) {
+		log.Infow("EventBus at capacity - MaxMsgs limit reached",
+			zap.String("eventSource", el.GetEventSourceName()),
+			zap.String("eventName", el.GetEventName()),
+			zap.Uint64("currentMsgs", streamInfo.State.Msgs),
+			zap.Int64("maxMsgs", streamInfo.Config.MaxMsgs))
+		return true
+	}
+
+	// Event bus has available capacity
+	log.Debugw("EventBus has available capacity, proceeding with SQS poll",
+		zap.String("eventSource", el.GetEventSourceName()),
+		zap.String("eventName", el.GetEventName()),
+		zap.Uint64("currentMsgs", streamInfo.State.Msgs),
+		zap.Int64("maxMsgs", streamInfo.Config.MaxMsgs),
+		zap.Uint64("currentBytes", streamInfo.State.Bytes),
+		zap.Int64("maxBytes", streamInfo.Config.MaxBytes))
+
+	return false
 }
 
 // StartListening starts listening events
@@ -93,6 +143,14 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 	}
 
 	log.Info("listening for messages on the queue...")
+
+	// Log capacity-based polling control status
+	if sqsEventSource.SkipPollingWhenEventBusFull {
+		log.Info("Capacity-based polling control enabled - will check event bus capacity before each poll")
+	}
+
+	consecutiveFullChecks := 0
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -100,6 +158,39 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 			return nil
 		default:
 		}
+
+		// Check event bus capacity before polling if enabled
+		if sqsEventSource.SkipPollingWhenEventBusFull {
+			if el.isEventBusFull(log) {
+				consecutiveFullChecks++
+
+				// Log warning every 10 minutes (60 checks * 10 seconds) when bus stays full
+				if consecutiveFullChecks%60 == 0 {
+					log.Warnw("EventBus has been full for extended period",
+						zap.String("eventSource", el.GetEventSourceName()),
+						zap.String("eventName", el.GetEventName()),
+						zap.Duration("duration", time.Duration(consecutiveFullChecks*10)*time.Second),
+						zap.Int("consecutiveChecks", consecutiveFullChecks))
+				} else {
+					log.Infow("EventBus is full, skipping SQS poll",
+						zap.String("eventSource", el.GetEventSourceName()),
+						zap.String("eventName", el.GetEventName()))
+				}
+
+				time.Sleep(10 * time.Second) // Wait before checking capacity again
+				continue
+			}
+
+			// Reset counter when capacity becomes available
+			if consecutiveFullChecks > 0 {
+				log.Infow("EventBus capacity available again, resuming SQS polling",
+					zap.String("eventSource", el.GetEventSourceName()),
+					zap.String("eventName", el.GetEventName()),
+					zap.Duration("wasFull", time.Duration(consecutiveFullChecks*10)*time.Second))
+				consecutiveFullChecks = 0
+			}
+		}
+
 		messages, err := fetchMessages(ctx, sqsClient, *queueURL.QueueUrl, 10, sqsEventSource.WaitTimeSeconds)
 		if err != nil {
 			log.Errorw("failed to get messages from SQS", zap.Error(err))

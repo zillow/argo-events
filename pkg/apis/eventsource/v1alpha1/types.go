@@ -722,6 +722,9 @@ type SQSEventSource struct {
 	// SessionToken refers to K8s secret containing AWS temporary credentials(STS) session token
 	// +optional
 	SessionToken *corev1.SecretKeySelector `json:"sessionToken,omitempty" protobuf:"bytes,13,opt,name=sessionToken"`
+	// SkipPollingWhenEventBusFull skips polling SQS when event bus is at capacity
+	// +optional
+	SkipPollingWhenEventBusFull bool `json:"skipPollingWhenEventBusFull,omitempty" protobuf:"varint,14,opt,name=skipPollingWhenEventBusFull"`
 }
 
 // PubSubEventSource refers to event-source for GCP PubSub related events.

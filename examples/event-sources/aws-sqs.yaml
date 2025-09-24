@@ -27,6 +27,14 @@ spec:
       # The duration (in seconds) for which the call waits for a message to arrive in the queue before returning.
       # MUST BE > 0 AND <= 20
       waitTimeSeconds: 20
+      
+      # CAPACITY-BASED POLLING CONTROL
+      # Skip polling SQS when event bus is at capacity to prevent backpressure
+      # When enabled, the event source will check event bus capacity before each
+      # poll attempt and skip polling when the event bus is full, reducing API
+      # calls and preventing message accumulation when downstream processing is slow.
+      # +optional
+      skipPollingWhenEventBusFull: true
 
 #    example-without-credentials:
 #      # If AWS access credentials are already present on the Pod's IAM role running the EventSource,

@@ -20,6 +20,7 @@ import (
 	"github.com/argoproj/argo-events/common/logging"
 	"github.com/argoproj/argo-events/eventbus"
 	eventbuscommon "github.com/argoproj/argo-events/eventbus/common"
+	"github.com/argoproj/argo-events/eventbus/jetstream/eventsource"
 	eventsourcecommon "github.com/argoproj/argo-events/eventsources/common"
 	"github.com/argoproj/argo-events/eventsources/sources/amqp"
 	"github.com/argoproj/argo-events/eventsources/sources/awssns"
@@ -518,6 +519,17 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 				// Continue starting other event services instead of failing all of them
 				continue
 			}
+			
+			// Set JetStream context for SQS event sources to enable capacity checking
+			if sqsServer, ok := server.(*awssqs.EventListener); ok {
+				if jetstreamConn, ok := e.eventBusConn.(*eventsource.JetstreamSourceConn); ok {
+					sqsServer.SetJetStreamContext(jetstreamConn.JSContext)
+					logger.Debugw("Set JetStream context for SQS event source",
+						zap.String("eventSource", server.GetEventSourceName()),
+						zap.String("eventName", server.GetEventName()))
+				}
+			}
+			
 			wg.Add(1)
 			go func(s EventingServer) {
 				defer wg.Done()
