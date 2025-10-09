@@ -64,21 +64,50 @@ func validateTriggers(triggers []v1alpha1.Trigger) error {
 	trigNames := make(map[string]bool)
 
 	for _, trigger := range triggers {
-		if err := validateTriggerTemplate(trigger.Template); err != nil {
+		if err := validateTrigger(trigger); err != nil {
 			return err
 		}
 		if _, ok := trigNames[trigger.Template.Name]; ok {
 			return fmt.Errorf("duplicate trigger name: %s", trigger.Template.Name)
 		}
 		trigNames[trigger.Template.Name] = true
-		if err := validateTriggerPolicy(&trigger); err != nil {
-			return err
-		}
-		if err := validateTriggerTemplateParameters(&trigger); err != nil {
-			return err
-		}
 	}
 	return nil
+}
+
+func validateTrigger(trigger v1alpha1.Trigger) error {
+	if err := validateTriggerTemplate(trigger.Template); err != nil {
+		return err
+	}
+	if err := validateTriggerPolicy(&trigger); err != nil {
+		return err
+	}
+	if err := validateTriggerTemplateParameters(&trigger); err != nil {
+		return err
+	}
+	if err := validateDlqTrigger(&trigger); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateDlqTrigger validates trigger.atLeastOnce==true and the trigger.dlqTrigger
+func validateDlqTrigger(trigger *v1alpha1.Trigger) error {
+	if trigger == nil {
+		return fmt.Errorf("trigger can't be nil")
+	}
+	if trigger.DlqTrigger == nil {
+		return nil
+	}
+	if !trigger.AtLeastOnce {
+		return fmt.Errorf("to use dlqTrigger, trigger.atLeastOnce must be set to true")
+	}
+	if !trigger.DlqTrigger.AtLeastOnce {
+		return fmt.Errorf("atLeastOnce must be set to true within the dlqTrigger")
+	}
+
+	return validateTrigger(*trigger.DlqTrigger)
 }
 
 // validateTriggerTemplate validates trigger template
@@ -145,6 +174,11 @@ func validateTriggerTemplate(template *v1alpha1.TriggerTemplate) error {
 	}
 	if template.CustomTrigger != nil {
 		if err := validateCustomTrigger(template.CustomTrigger); err != nil {
+			return fmt.Errorf("template %s is invalid, %w", template.Name, err)
+		}
+	}
+	if template.Email != nil {
+		if err := validateEmailTrigger(template.Email); err != nil {
 			return fmt.Errorf("template %s is invalid, %w", template.Name, err)
 		}
 	}
@@ -354,6 +388,27 @@ func validateSlackTrigger(trigger *v1alpha1.SlackTrigger) error {
 	}
 	if trigger.SlackToken == nil {
 		return fmt.Errorf("slack token can't be empty")
+	}
+	if trigger.Parameters != nil {
+		for i, parameter := range trigger.Parameters {
+			if err := validateTriggerParameter(&parameter); err != nil {
+				return fmt.Errorf("resource parameter index: %d. err: %w", i, err)
+			}
+		}
+	}
+	return nil
+}
+
+// validateEmailTrigger validates the Email trigger
+func validateEmailTrigger(trigger *v1alpha1.EmailTrigger) error {
+	if trigger == nil {
+		return fmt.Errorf("trigger can't be nil")
+	}
+	if trigger.Host == "" {
+		return fmt.Errorf("host can't be empty")
+	}
+	if 0 > trigger.Port || trigger.Port > 65535 {
+		return fmt.Errorf("port: %v, port should be between 0-65535", trigger.Port)
 	}
 	if trigger.Parameters != nil {
 		for i, parameter := range trigger.Parameters {

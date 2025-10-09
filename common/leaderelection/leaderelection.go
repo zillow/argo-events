@@ -11,7 +11,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/nats-io/graft"
 	nats "github.com/nats-io/nats.go"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -45,7 +44,11 @@ func NewElector(ctx context.Context, eventBusConfig eventbusv1alpha1.BusConfig, 
 	case eventBusConfig.NATS != nil:
 		return newEventBusElector(ctx, eventBusConfig.NATS.Auth, clusterName, clusterSize, eventBusConfig.NATS.URL)
 	case eventBusConfig.JetStream != nil:
-		return newEventBusElector(ctx, &eventbusv1alpha1.AuthStrategyBasic, clusterName, clusterSize, eventBusConfig.JetStream.URL)
+		if eventBusConfig.JetStream.AccessSecret != nil {
+			return newEventBusElector(ctx, &eventbusv1alpha1.AuthStrategyBasic, clusterName, clusterSize, eventBusConfig.JetStream.URL)
+		} else {
+			return newEventBusElector(ctx, &eventbusv1alpha1.AuthStrategyNone, clusterName, clusterSize, eventBusConfig.JetStream.URL)
+		}
 	default:
 		return nil, fmt.Errorf("invalid event bus")
 	}
@@ -75,7 +78,7 @@ func getEventBusAuth(ctx context.Context, authStrategy *eventbusv1alpha1.AuthStr
 			Strategy: eventbusv1alpha1.AuthStrategyNone,
 		}
 	} else {
-		v := viper.New()
+		v := common.ViperWithLogging()
 		v.SetConfigName("auth")
 		v.SetConfigType("yaml")
 		v.AddConfigPath(eventBusAuthFileMountPath)

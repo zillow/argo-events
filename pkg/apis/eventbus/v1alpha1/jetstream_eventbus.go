@@ -9,7 +9,7 @@ import (
 type JetStreamBus struct {
 	// JetStream version, such as "2.7.3"
 	Version string `json:"version,omitempty" protobuf:"bytes,1,opt,name=version"`
-	// Redis StatefulSet size
+	// JetStream StatefulSet size
 	// +kubebuilder:default=3
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,2,opt,name=replicas"`
 	// ContainerTemplate contains customized spec for Nats JetStream container
@@ -79,7 +79,8 @@ type JetStreamBus struct {
 	// +optional
 	StartArgs []string `json:"startArgs,omitempty" protobuf:"bytes,17,rep,name=startArgs"`
 	// Optional configuration for the streams to be created in this JetStream service, if specified, it will be merged with the default configuration in controller-config.
-	// It accepts a YAML format configuration, available fields include, "maxBytes", "maxMsgs", "maxAge" (e.g. 72h), "replicas" (1, 3, 5), "duplicates" (e.g. 5m).
+	// It accepts a YAML format configuration, available fields include, "maxBytes", "maxMsgs", "maxAge" (e.g. 72h), "replicas" (1, 3, 5), "duplicates" (e.g. 5m),
+	// "retention" (e.g. 0: Limits (default), 1: Interest, 2: WorkQueue), "Discard" (e.g. 0: DiscardOld (default), 1: DiscardNew).
 	// +optional
 	StreamConfig *string `json:"streamConfig,omitempty" protobuf:"bytes,18,opt,name=streamConfig"`
 	// Maximum number of bytes in a message payload, 0 means unlimited. Defaults to 1MB
@@ -89,9 +90,6 @@ type JetStreamBus struct {
 
 func (j JetStreamBus) GetReplicas() int {
 	if j.Replicas == nil {
-		return 3
-	}
-	if *j.Replicas < 3 {
 		return 3
 	}
 	return int(*j.Replicas)

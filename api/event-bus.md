@@ -211,6 +211,19 @@ Kafka eventbus
 </p>
 </td>
 </tr>
+<tr>
+<td>
+<code>jetstreamExotic</code></br> <em>
+<a href="#argoproj.io/v1alpha1.JetStreamConfig"> JetStreamConfig </a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Exotic JetStream
+</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -280,6 +293,19 @@ KafkaBus </a> </em>
 <em>(Optional)</em>
 <p>
 Kafka eventbus
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>jetstreamExotic</code></br> <em>
+<a href="#argoproj.io/v1alpha1.JetStreamConfig"> JetStreamConfig </a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Exotic JetStream
 </p>
 </td>
 </tr>
@@ -373,7 +399,7 @@ JetStream version, such as “2.7.3”
 </td>
 <td>
 <p>
-Redis StatefulSet size
+JetStream StatefulSet size
 </p>
 </td>
 </tr>
@@ -596,7 +622,9 @@ Optional configuration for the streams to be created in this JetStream
 service, if specified, it will be merged with the default configuration
 in controller-config. It accepts a YAML format configuration, available
 fields include, “maxBytes”, “maxMsgs”, “maxAge” (e.g. 72h), “replicas”
-(1, 3, 5), “duplicates” (e.g. 5m).
+(1, 3, 5), “duplicates” (e.g. 5m), “retention” (e.g. 0: Limits
+(default), 1: Interest, 2: WorkQueue), “Discard” (e.g. 0: DiscardOld
+(default), 1: DiscardNew).
 </p>
 </td>
 </tr>
@@ -619,7 +647,8 @@ JetStreamConfig
 </h3>
 <p>
 (<em>Appears on:</em>
-<a href="#argoproj.io/v1alpha1.BusConfig">BusConfig</a>)
+<a href="#argoproj.io/v1alpha1.BusConfig">BusConfig</a>,
+<a href="#argoproj.io/v1alpha1.EventBusSpec">EventBusSpec</a>)
 </p>
 <p>
 </p>

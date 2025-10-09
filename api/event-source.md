@@ -741,6 +741,31 @@ Filter
 </p>
 </td>
 </tr>
+<tr>
+<td>
+<code>decodeMessage</code></br> <em> bool </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+DecodeMessage specifies if all the messages should be base64 decoded. If
+set to true the decoding is done before the evaluation of JSONBody
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>waitTimeInSeconds</code></br> <em> int32 </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+WaitTimeInSeconds is the duration (in seconds) for which the event
+source waits between empty results from the queue. The default value is
+3 seconds.
+</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="argoproj.io/v1alpha1.AzureServiceBusEventSource">
@@ -1208,7 +1233,7 @@ Description
 </td>
 <td>
 <p>
-Webhook holds configuration to run a http server
+Webhook holds configuration to run a http server.
 </p>
 </td>
 </tr>
@@ -1220,8 +1245,8 @@ Webhook holds configuration to run a http server
 <em>(Optional)</em>
 <p>
 DeprecatedProjectKey is the key of project for which integration needs
-to set up Deprecated: use Repositories instead. Will be unsupported in
-v1.8
+to set up. Deprecated: use Repositories instead. Will be unsupported in
+v1.8.
 </p>
 </td>
 </tr>
@@ -1233,8 +1258,20 @@ v1.8
 <em>(Optional)</em>
 <p>
 DeprecatedRepositorySlug is the slug of the repository for which
-integration needs to set up Deprecated: use Repositories instead. Will
-be unsupported in v1.8
+integration needs to set up. Deprecated: use Repositories instead. Will
+be unsupported in v1.8.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>projects</code></br> <em> \[\]string </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Projects holds a list of projects for which integration needs to set up,
+this will add the webhook to all repositories in the project.
 </p>
 </td>
 </tr>
@@ -1248,7 +1285,7 @@ be unsupported in v1.8
 <em>(Optional)</em>
 <p>
 Repositories holds a list of repositories for which integration needs to
-set up
+set up.
 </p>
 </td>
 </tr>
@@ -1257,9 +1294,25 @@ set up
 <code>events</code></br> <em> \[\]string </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>
 Events are bitbucket event to listen to. Refer
 <a href="https://confluence.atlassian.com/bitbucketserver/event-payload-938025882.html">https://confluence.atlassian.com/bitbucketserver/event-payload-938025882.html</a>
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>skipBranchRefsChangedOnOpenPR</code></br> <em> bool </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+SkipBranchRefsChangedOnOpenPR bypasses the event repo:refs_changed for
+branches whenever there’s an associated open pull request. This helps in
+optimizing the event handling process by avoiding unnecessary triggers
+for branch reference changes that are already part of a pull request
+under review.
 </p>
 </td>
 </tr>
@@ -1272,7 +1325,7 @@ Kubernetes core/v1.SecretKeySelector </a> </em>
 <td>
 <p>
 AccessToken is reference to K8s secret which holds the bitbucket api
-access information
+access information.
 </p>
 </td>
 </tr>
@@ -1285,7 +1338,7 @@ Kubernetes core/v1.SecretKeySelector </a> </em>
 <td>
 <p>
 WebhookSecret is reference to K8s secret which holds the bitbucket
-webhook secret (for HMAC validation)
+webhook secret (for HMAC validation).
 </p>
 </td>
 </tr>
@@ -1296,7 +1349,7 @@ webhook secret (for HMAC validation)
 <td>
 <p>
 BitbucketServerBaseURL is the base URL for API requests to a custom
-endpoint
+endpoint.
 </p>
 </td>
 </tr>
@@ -1337,6 +1390,30 @@ Filter
 </p>
 </td>
 </tr>
+<tr>
+<td>
+<code>tls</code></br> <em>
+github.com/argoproj/argo-events/pkg/apis/common.TLSConfig </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+TLS configuration for the bitbucketserver client.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>checkInterval</code></br> <em> string </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+CheckInterval is a duration in which to wait before checking that the
+webhooks exist, e.g. 1s, 30m, 2h… (defaults to 1m)
+</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="argoproj.io/v1alpha1.BitbucketServerRepository">
@@ -1366,7 +1443,7 @@ Description
 </td>
 <td>
 <p>
-ProjectKey is the key of project for which integration needs to set up
+ProjectKey is the key of project for which integration needs to set up.
 </p>
 </td>
 </tr>
@@ -1377,7 +1454,7 @@ ProjectKey is the key of project for which integration needs to set up
 <td>
 <p>
 RepositorySlug is the slug of the repository for which integration needs
-to set up
+to set up.
 </p>
 </td>
 </tr>
@@ -2234,6 +2311,32 @@ AzureQueueStorage event source
 </p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sftp</code></br> <em>
+<a href="#argoproj.io/v1alpha1.SFTPEventSource">
+map\[string\]github.com/argoproj/argo-events/pkg/apis/eventsource/v1alpha1.SFTPEventSource
+</a> </em>
+</td>
+<td>
+<p>
+SFTP event sources
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>gerrit</code></br> <em>
+<a href="#argoproj.io/v1alpha1.GerritEventSource">
+map\[string\]github.com/argoproj/argo-events/pkg/apis/eventsource/v1alpha1.GerritEventSource
+</a> </em>
+</td>
+<td>
+<p>
+Gerrit event source
+</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -2264,6 +2367,7 @@ EventSourceFilter
 <a href="#argoproj.io/v1alpha1.EmitterEventSource">EmitterEventSource</a>,
 <a href="#argoproj.io/v1alpha1.FileEventSource">FileEventSource</a>,
 <a href="#argoproj.io/v1alpha1.GenericEventSource">GenericEventSource</a>,
+<a href="#argoproj.io/v1alpha1.GerritEventSource">GerritEventSource</a>,
 <a href="#argoproj.io/v1alpha1.GithubEventSource">GithubEventSource</a>,
 <a href="#argoproj.io/v1alpha1.GitlabEventSource">GitlabEventSource</a>,
 <a href="#argoproj.io/v1alpha1.HDFSEventSource">HDFSEventSource</a>,
@@ -2275,6 +2379,7 @@ EventSourceFilter
 <a href="#argoproj.io/v1alpha1.PulsarEventSource">PulsarEventSource</a>,
 <a href="#argoproj.io/v1alpha1.RedisEventSource">RedisEventSource</a>,
 <a href="#argoproj.io/v1alpha1.RedisStreamEventSource">RedisStreamEventSource</a>,
+<a href="#argoproj.io/v1alpha1.SFTPEventSource">SFTPEventSource</a>,
 <a href="#argoproj.io/v1alpha1.SNSEventSource">SNSEventSource</a>,
 <a href="#argoproj.io/v1alpha1.SQSEventSource">SQSEventSource</a>,
 <a href="#argoproj.io/v1alpha1.SlackEventSource">SlackEventSource</a>,
@@ -2748,6 +2853,32 @@ AzureQueueStorage event source
 </p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sftp</code></br> <em>
+<a href="#argoproj.io/v1alpha1.SFTPEventSource">
+map\[string\]github.com/argoproj/argo-events/pkg/apis/eventsource/v1alpha1.SFTPEventSource
+</a> </em>
+</td>
+<td>
+<p>
+SFTP event sources
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>gerrit</code></br> <em>
+<a href="#argoproj.io/v1alpha1.GerritEventSource">
+map\[string\]github.com/argoproj/argo-events/pkg/apis/eventsource/v1alpha1.GerritEventSource
+</a> </em>
+</td>
+<td>
+<p>
+Gerrit event source
+</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="argoproj.io/v1alpha1.EventSourceStatus">
@@ -2962,6 +3093,145 @@ Kubernetes core/v1.SecretKeySelector </a> </em>
 <p>
 AuthSecret holds a secret selector that contains a bearer token for
 authentication
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>filter</code></br> <em>
+<a href="#argoproj.io/v1alpha1.EventSourceFilter"> EventSourceFilter
+</a> </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Filter
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="argoproj.io/v1alpha1.GerritEventSource">
+GerritEventSource
+</h3>
+<p>
+(<em>Appears on:</em>
+<a href="#argoproj.io/v1alpha1.EventSourceSpec">EventSourceSpec</a>)
+</p>
+<p>
+<p>
+GerritEventSource refers to event-source related to gerrit events
+</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>
+Field
+</th>
+<th>
+Description
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>webhook</code></br> <em>
+<a href="#argoproj.io/v1alpha1.WebhookContext"> WebhookContext </a>
+</em>
+</td>
+<td>
+<p>
+Webhook holds configuration to run a http server
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>hookName</code></br> <em> string </em>
+</td>
+<td>
+<p>
+HookName is the name of the webhook
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>events</code></br> <em> \[\]string </em>
+</td>
+<td>
+<p>
+Events are gerrit event to listen to. Refer
+<a href="https://gerrit-review.googlesource.com/Documentation/cmd-stream-events.html#events">https://gerrit-review.googlesource.com/Documentation/cmd-stream-events.html#events</a>
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>auth</code></br> <em>
+github.com/argoproj/argo-events/pkg/apis/common.BasicAuth </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Auth hosts secret selectors for username and password
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>gerritBaseURL</code></br> <em> string </em>
+</td>
+<td>
+<p>
+GerritBaseURL is the base URL for API requests to a custom endpoint
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>deleteHookOnFinish</code></br> <em> bool </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+DeleteHookOnFinish determines whether to delete the Gerrit hook for the
+project once the event source is stopped.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>metadata</code></br> <em> map\[string\]string </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Metadata holds the user defined metadata which will passed along the
+event payload.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>projects</code></br> <em> \[\]string </em>
+</td>
+<td>
+<p>
+List of project namespace paths like “whynowy/test”.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sslVerify</code></br> <em> bool </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+SslVerify to enable ssl verification
 </p>
 </td>
 </tr>
@@ -3848,7 +4118,7 @@ Filter
 <p>
 Yaml format Sarama config for Kafka connection. It follows the struct of
 sarama.Config. See
-<a href="https://github.com/Shopify/sarama/blob/main/config.go">https://github.com/Shopify/sarama/blob/main/config.go</a>
+<a href="https://github.com/IBM/sarama/blob/main/config.go">https://github.com/IBM/sarama/blob/main/config.go</a>
 e.g.
 </p>
 <p>
@@ -4176,6 +4446,19 @@ Auth information
 <em>(Optional)</em>
 <p>
 Filter
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>queue</code></br> <em> string </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Queue is the name of the queue group to subscribe as if specified. Uses
+QueueSubscribe logic to subscribe as queue group. If the queue is empty,
+uses default Subscribe logic.
 </p>
 </td>
 </tr>
@@ -5125,7 +5408,10 @@ Prefix filter is applied on the resource name.
 <p>
 Labels provide listing options to K8s API to watch resource/s. Refer
 <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/label-selectors/">https://kubernetes.io/docs/concepts/overview/working-with-objects/label-selectors/</a>
-for more info.
+for more info. Unlike K8s field selector, multiple values are passed as
+comma separated values instead of list of values. Eg: value:
+value1,value2. Same as K8s label selector, operator “=”, “==”, “!=”,
+“exists”, “!”, “notin”, “in”, “gt” and “lt” are supported
 </p>
 </td>
 </tr>
@@ -5168,6 +5454,142 @@ treated as valid.
 <p>
 If the resource is created after the start time then the event is
 treated as valid.
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="argoproj.io/v1alpha1.SFTPEventSource">
+SFTPEventSource
+</h3>
+<p>
+(<em>Appears on:</em>
+<a href="#argoproj.io/v1alpha1.EventSourceSpec">EventSourceSpec</a>)
+</p>
+<p>
+<p>
+SFTPEventSource describes an event-source for sftp related events.
+</p>
+</p>
+<table>
+<thead>
+<tr>
+<th>
+Field
+</th>
+<th>
+Description
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>eventType</code></br> <em> string </em>
+</td>
+<td>
+<p>
+Type of file operations to watch Refer
+<a href="https://github.com/fsnotify/fsnotify/blob/master/fsnotify.go">https://github.com/fsnotify/fsnotify/blob/master/fsnotify.go</a>
+for more information
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>watchPathConfig</code></br> <em>
+<a href="#argoproj.io/v1alpha1.WatchPathConfig"> WatchPathConfig </a>
+</em>
+</td>
+<td>
+<p>
+WatchPathConfig contains configuration about the file path to watch
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>username</code></br> <em>
+<a href="https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#secretkeyselector-v1-core">
+Kubernetes core/v1.SecretKeySelector </a> </em>
+</td>
+<td>
+<p>
+Username required for authentication if any.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>password</code></br> <em>
+<a href="https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#secretkeyselector-v1-core">
+Kubernetes core/v1.SecretKeySelector </a> </em>
+</td>
+<td>
+<p>
+Password required for authentication if any.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sshKeySecret</code></br> <em>
+<a href="https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#secretkeyselector-v1-core">
+Kubernetes core/v1.SecretKeySelector </a> </em>
+</td>
+<td>
+<p>
+SSHKeySecret refers to the secret that contains SSH key. Key needs to
+contain private key and public key.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>address</code></br> <em>
+<a href="https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#secretkeyselector-v1-core">
+Kubernetes core/v1.SecretKeySelector </a> </em>
+</td>
+<td>
+<p>
+Address sftp address.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>metadata</code></br> <em> map\[string\]string </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Metadata holds the user defined metadata which will passed along the
+event payload.
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>filter</code></br> <em>
+<a href="#argoproj.io/v1alpha1.EventSourceFilter"> EventSourceFilter
+</a> </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+Filter
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>pollIntervalDuration</code></br> <em> string </em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>
+PollIntervalDuration the interval at which to poll the SFTP server
+defaults to 10 seconds
 </p>
 </td>
 </tr>
@@ -5537,7 +5959,7 @@ Key name
 <td>
 <em>(Optional)</em>
 <p>
-Supported operations like ==, !=, \<=, \>= etc. Defaults to ==. Refer
+Supported operations like ==, != etc. Defaults to ==. Refer
 <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a>
 for more info.
 </p>
@@ -6141,7 +6563,8 @@ WatchPathConfig
 <p>
 (<em>Appears on:</em>
 <a href="#argoproj.io/v1alpha1.FileEventSource">FileEventSource</a>,
-<a href="#argoproj.io/v1alpha1.HDFSEventSource">HDFSEventSource</a>)
+<a href="#argoproj.io/v1alpha1.HDFSEventSource">HDFSEventSource</a>,
+<a href="#argoproj.io/v1alpha1.SFTPEventSource">SFTPEventSource</a>)
 </p>
 <p>
 </p>
@@ -6197,6 +6620,7 @@ WebhookContext
 (<em>Appears on:</em>
 <a href="#argoproj.io/v1alpha1.BitbucketEventSource">BitbucketEventSource</a>,
 <a href="#argoproj.io/v1alpha1.BitbucketServerEventSource">BitbucketServerEventSource</a>,
+<a href="#argoproj.io/v1alpha1.GerritEventSource">GerritEventSource</a>,
 <a href="#argoproj.io/v1alpha1.GithubEventSource">GithubEventSource</a>,
 <a href="#argoproj.io/v1alpha1.GitlabEventSource">GitlabEventSource</a>,
 <a href="#argoproj.io/v1alpha1.SNSEventSource">SNSEventSource</a>,

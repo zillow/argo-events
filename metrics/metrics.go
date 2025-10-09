@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"net/http"
+	"runtime"
 
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
+	argoevents "github.com/argoproj/argo-events"
 	"github.com/argoproj/argo-events/common/logging"
 )
 
@@ -23,6 +25,16 @@ const (
 	labelTriggerName     = "trigger_name"
 )
 
+var (
+	buildInfo = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "build_info",
+			Help: "A metric with a constant '1' value labeled by version from which Argo-Events was built.",
+		},
+		[]string{"version", "goversion", "goarch", "commit"},
+	)
+)
+
 // Metrics represents EventSource metrics information
 type Metrics struct {
 	namespace               string
@@ -33,6 +45,7 @@ type Metrics struct {
 	eventProcessingDuration *prometheus.SummaryVec
 	actionTriggered         *prometheus.CounterVec
 	actionFailed            *prometheus.CounterVec
+	actionRetriesFailed     *prometheus.CounterVec
 	actionDuration          *prometheus.SummaryVec
 }
 
@@ -96,6 +109,14 @@ func NewMetrics(namespace string) *Metrics {
 				labelNamespace: namespace,
 			},
 		}, []string{labelSensorName, labelTriggerName}),
+		actionRetriesFailed: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: prefix,
+			Name:      "action_retries_failed_total",
+			Help:      "How many actions failed after the retries have been exhausted. https://argoproj.github.io/argo-events/metrics/#action_retries_failed_total",
+			ConstLabels: prometheus.Labels{
+				labelNamespace: namespace,
+			},
+		}, []string{labelSensorName, labelTriggerName}),
 		actionDuration: prometheus.NewSummaryVec(prometheus.SummaryOpts{
 			Namespace: prefix,
 			Name:      "action_duration_milliseconds",
@@ -115,6 +136,7 @@ func (m *Metrics) Collect(ch chan<- prometheus.Metric) {
 	m.eventProcessingDuration.Collect(ch)
 	m.actionTriggered.Collect(ch)
 	m.actionFailed.Collect(ch)
+	m.actionRetriesFailed.Collect(ch)
 	m.actionDuration.Collect(ch)
 }
 
@@ -126,6 +148,7 @@ func (m *Metrics) Describe(ch chan<- *prometheus.Desc) {
 	m.eventProcessingDuration.Describe(ch)
 	m.actionTriggered.Describe(ch)
 	m.actionFailed.Describe(ch)
+	m.actionRetriesFailed.Describe(ch)
 	m.actionDuration.Describe(ch)
 }
 
@@ -161,6 +184,10 @@ func (m *Metrics) ActionFailed(sensorName, triggerName string) {
 	m.actionFailed.WithLabelValues(sensorName, triggerName).Inc()
 }
 
+func (m *Metrics) ActionRetriesFailed(sensorName, triggerName string) {
+	m.actionRetriesFailed.WithLabelValues(sensorName, triggerName).Inc()
+}
+
 func (m *Metrics) ActionDuration(sensorName, triggerName string, num float64) {
 	m.actionDuration.WithLabelValues(sensorName, triggerName).Observe(num)
 }
@@ -170,10 +197,19 @@ func (m *Metrics) Run(ctx context.Context, addr string) {
 	log := logging.FromContext(ctx)
 	metricsRegistry := prometheus.NewRegistry()
 	metricsRegistry.MustRegister(collectors.NewGoCollector(), m)
+	metricsRegistry.MustRegister(buildInfo)
+	recordBuildInfo()
+
 	http.Handle("/metrics", promhttp.HandlerFor(metricsRegistry, promhttp.HandlerOpts{}))
 
 	log.Info("starting metrics server")
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalw("failed to start metrics server", zap.Error(err))
 	}
+}
+
+// recordBuildInfo publishes information about Argo-Rollouts version and runtime info through an info metric (gauge).
+func recordBuildInfo() {
+	vers := argoevents.GetVersion()
+	buildInfo.WithLabelValues(vers.Version, runtime.Version(), runtime.GOARCH, vers.GitCommit).Set(1)
 }

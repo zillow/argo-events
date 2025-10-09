@@ -11,9 +11,8 @@ metadata:
   name: default
 spec:
   jetstream:
-    version:
-      latest # Do NOT use "latest" but a specific version in your real deployment
-      # See: https://argoproj.github.io/argo-events/eventbus/jetstream/#version
+    version: latest # Do NOT use "latest" but a specific version in your real deployment
+                    # See: https://argoproj.github.io/argo-events/eventbus/jetstream/#version
 ```
 
 The example above brings up a Jetstream
@@ -28,13 +27,14 @@ for the full spec of `jetstream`.
 
 ### version
 
-The version number specified in the example above is the release number for the NATS server. We will support some subset of these as we've tried them out and only plan to upgrade them as needed. To take a look at what that includes:
+The version number specified in the example above is the release number for the NATS server. We will support some subset of these as we've tried them out and only plan to upgrade them as needed. The list of available versions is managed by the controller manager ConfigMap, which can be updated to support new versions.
 
 ```
 kubectl get configmap argo-events-controller-config -o yaml
 ```
 
 Check [here](https://docs.nats.io/nats-concepts/jetstream/streams#configuration) for a list of configurable features per version.
+
 
 ### A more involved example
 
@@ -90,7 +90,7 @@ spec:
       eventSourceName: webhook
       eventName: example
       jetStream:
-        deliverPolicy: "all" # Start from earliest available message (default)
+        deliverPolicy: "all" # Start from earliest available message
   triggers:
     - template:
         name: http-trigger
@@ -109,9 +109,9 @@ metadata:
   name: default
 spec:
   jetstreamExotic:
-    url: nats://xxxxx:xxx
-    accessSecret:
-      name: my-secret-name
-      key: secret-key
-    streamConfig: ""
+      url: nats://xxxxx:xxx
+      accessSecret:
+        name: my-secret-name
+        key: secret-key
+      streamConfig: ""
 ```

@@ -34,6 +34,7 @@ import (
 	"github.com/argoproj/argo-events/eventsources/sources/file"
 	"github.com/argoproj/argo-events/eventsources/sources/gcppubsub"
 	"github.com/argoproj/argo-events/eventsources/sources/generic"
+	"github.com/argoproj/argo-events/eventsources/sources/gerrit"
 	"github.com/argoproj/argo-events/eventsources/sources/github"
 	"github.com/argoproj/argo-events/eventsources/sources/gitlab"
 	"github.com/argoproj/argo-events/eventsources/sources/hdfs"
@@ -46,6 +47,7 @@ import (
 	"github.com/argoproj/argo-events/eventsources/sources/redis"
 	redisstream "github.com/argoproj/argo-events/eventsources/sources/redis_stream"
 	"github.com/argoproj/argo-events/eventsources/sources/resource"
+	"github.com/argoproj/argo-events/eventsources/sources/sftp"
 	"github.com/argoproj/argo-events/eventsources/sources/slack"
 	"github.com/argoproj/argo-events/eventsources/sources/storagegrid"
 	"github.com/argoproj/argo-events/eventsources/sources/stripe"
@@ -165,6 +167,26 @@ func GetEventingServers(eventSource *v1alpha1.EventSource, metrics *eventsourcem
 			servers = append(servers, &file.EventListener{EventSourceName: eventSource.Name, EventName: k, FileEventSource: v, Metrics: metrics})
 		}
 		result[apicommon.FileEvent] = servers
+	}
+	if len(eventSource.Spec.SFTP) != 0 {
+		servers := []EventingServer{}
+		for k, v := range eventSource.Spec.SFTP {
+			if v.Filter != nil {
+				filters[k] = v.Filter
+			}
+			servers = append(servers, &sftp.EventListener{EventSourceName: eventSource.Name, EventName: k, SFTPEventSource: v, Metrics: metrics})
+		}
+		result[apicommon.SFTPEvent] = servers
+	}
+	if len(eventSource.Spec.Gerrit) != 0 {
+		servers := []EventingServer{}
+		for k, v := range eventSource.Spec.Gerrit {
+			if v.Filter != nil {
+				filters[k] = v.Filter
+			}
+			servers = append(servers, &gerrit.EventListener{EventSourceName: eventSource.Name, EventName: k, GerritEventSource: v, Metrics: metrics})
+		}
+		result[apicommon.GerritEvent] = servers
 	}
 	if len(eventSource.Spec.Github) != 0 {
 		servers := []EventingServer{}
@@ -524,8 +546,9 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 							}
 						}
 
+						uuidNew := uuid.New()
 						event := cloudevents.NewEvent()
-						event.SetID(fmt.Sprintf("%x", uuid.New()))
+						event.SetID(fmt.Sprintf("%x", uuidNew[:]))
 						event.SetType(string(s.GetEventSourceType()))
 						event.SetSource(s.GetEventSourceName())
 						event.SetSubject(s.GetEventName())
@@ -557,12 +580,12 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 							},
 							Body: eventBody,
 						}
-
+						logger.Debugw(string(data), zap.String("eventID", event.ID()))
 						if err = common.DoWithRetry(&common.DefaultBackoff, func() error {
 							return e.eventBusConn.Publish(ctx, msg)
 						}); err != nil {
 							logger.Errorw("Failed to publish an event", zap.Error(err), zap.String(logging.LabelEventName,
-								s.GetEventName()), zap.Any(logging.LabelEventSourceType, s.GetEventSourceType()))
+								s.GetEventName()), zap.Any(logging.LabelEventSourceType, s.GetEventSourceType()), zap.String("eventID", event.ID()))
 							e.metrics.EventSentFailed(s.GetEventSourceName(), s.GetEventName())
 							return eventbuscommon.NewEventBusError(err)
 						}

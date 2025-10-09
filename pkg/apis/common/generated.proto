@@ -24,7 +24,7 @@ import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "common";
+option go_package = "github.com/argoproj/argo-events/pkg/apis/common";
 
 // Amount represent a numeric amount.
 message Amount {
@@ -122,6 +122,8 @@ message S3Artifact {
   optional S3Filter filter = 8;
 
   map<string, string> metadata = 9;
+
+  optional k8s.io.api.core.v1.SecretKeySelector caCertificate = 10;
 }
 
 // S3Bucket contains information to describe an S3 Bucket
