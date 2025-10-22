@@ -63,4 +63,51 @@ For Jetstream, TLS is turned on for all client-server communication as well as b
 
 ## How it works under the hood
 
-Jetstream has the concept of a Stream, and Subjects (i.e. topics) which are used on a Stream. From the documentation: “Each Stream defines how messages are stored and what the limits (duration, size, interest) of the retention are.” For Argo Events, we have one Stream called "default" with a single set of settings, but we have multiple subjects, each of which is named `default.<eventsourcename>.<eventname>`. Sensors subscribe to the subjects they need using durable consumers.
+Jetstream has the concept of a Stream, and Subjects (i.e. topics) which are used on a Stream. From the documentation: "Each Stream defines how messages are stored and what the limits (duration, size, interest) of the retention are." For Argo Events, we have one Stream called "default" with a single set of settings, but we have multiple subjects, each of which is named `default.<eventsourcename>.<eventname>`. Sensors subscribe to the subjects they need using durable consumers.
+
+### Sensor Deliver Policy Configuration
+
+When using JetStream as the EventBus, you can configure the deliver policy for each sensor dependency using the `jetStream` field in the `EventDependency` specification. This allows you to control how messages are delivered to your sensor:
+
+- **`all`**: Start receiving from the earliest available message in the stream
+- **`last`**: Start with the last message added to the stream, or the last message matching the consumer's filter subject if defined
+- **`new`**: Start receiving messages created after the consumer was created
+
+Example sensor configuration:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: example
+spec:
+  dependencies:
+    - name: test-dep
+      eventSourceName: webhook
+      eventName: example
+      jetStream:
+        deliverPolicy: "all" # Start from earliest available message
+  triggers:
+    - template:
+        name: http-trigger
+        http:
+          url: http://example.com/webhook
+```
+
+### Exotic
+
+To use an existing JetStream service, follow the example below.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+spec:
+  jetstreamExotic:
+      url: nats://xxxxx:xxx
+      accessSecret:
+        name: my-secret-name
+        key: secret-key
+      streamConfig: ""
+```
