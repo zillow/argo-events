@@ -29,7 +29,7 @@ spec:
       waitTimeSeconds: 20
       
       # CAPACITY-BASED POLLING CONTROL
-      # Skip polling SQS when event bus is at capacity to prevent backpressure
+      # Skip polling SQS when event bus is at capacity
       # When enabled, the event source will check event bus capacity before each
       # poll attempt and skip polling when the event bus is full, reducing API
       # calls and preventing message accumulation when downstream processing is slow.
