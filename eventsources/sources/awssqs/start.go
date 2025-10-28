@@ -29,6 +29,7 @@ import (
 	nats "github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 
+	"github.com/argoproj/argo-events/common"
 	"github.com/argoproj/argo-events/common/logging"
 	eventsourcecommon "github.com/argoproj/argo-events/eventsources/common"
 	awscommon "github.com/argoproj/argo-events/eventsources/common/aws"
@@ -79,7 +80,7 @@ func (el *EventListener) isEventBusFull(log *zap.SugaredLogger) bool {
 		return true
 	}
 
-	streamInfo, err := el.JSContext.StreamInfo("default")
+	streamInfo, err := el.JSContext.StreamInfo(common.JetStreamStreamName)
 	if err != nil {
 		// If we can't check capacity, treat as unavailable to prevent message loss
 		log.Warnw("Failed to get stream info, treating as unavailable to prevent message loss",
