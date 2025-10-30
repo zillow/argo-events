@@ -26,11 +26,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	sqslib "github.com/aws/aws-sdk-go/service/sqs"
-	nats "github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 
 	"github.com/argoproj/argo-events/common"
 	"github.com/argoproj/argo-events/common/logging"
+	eventbuscommon "github.com/argoproj/argo-events/eventbus/common"
+	eventsource "github.com/argoproj/argo-events/eventbus/jetstream/eventsource"
 	eventsourcecommon "github.com/argoproj/argo-events/eventsources/common"
 	awscommon "github.com/argoproj/argo-events/eventsources/common/aws"
 	"github.com/argoproj/argo-events/eventsources/sources"
@@ -46,8 +47,9 @@ type EventListener struct {
 	EventName       string
 	SQSEventSource  v1alpha1.SQSEventSource
 	Metrics         *metrics.Metrics
-	// JetStream context for capacity checking (set during StartListening)
-	JSContext nats.JetStreamContext
+	// EventBus connection for capacity checking (set during initialization)
+	// Stores reference to the connection, which is automatically updated on reconnection
+	EventBusConn eventbuscommon.EventSourceConnection
 }
 
 // GetEventSourceName returns name of event source
@@ -65,22 +67,33 @@ func (el *EventListener) GetEventSourceType() apicommon.EventSourceType {
 	return apicommon.SQSEvent
 }
 
-// SetJetStreamContext sets the JetStream context for capacity checking
-func (el *EventListener) SetJetStreamContext(jsContext nats.JetStreamContext) {
-	el.JSContext = jsContext
+// The connection reference is automatically updated on reconnection,
+// ensuring capacity checks always use the current active connection
+func (el *EventListener) SetEventBusConnection(conn eventbuscommon.EventSourceConnection) {
+	el.EventBusConn = conn
 }
 
 // isEventBusFull checks if the event bus is at capacity or unavailable
 func (el *EventListener) isEventBusFull(log *zap.SugaredLogger) bool {
-	if el.JSContext == nil {
-		// If no JetStream context, treat as unavailable to prevent message loss
-		log.Warnw("JetStream context not available, treating as unavailable to prevent message loss",
+	// Check if connection is available and active
+	if el.EventBusConn == nil || el.EventBusConn.IsClosed() {
+		log.Warnw("EventBus connection not available or closed, treating as unavailable to prevent message loss",
 			zap.String("eventSource", el.GetEventSourceName()),
 			zap.String("eventName", el.GetEventName()))
 		return true
 	}
 
-	streamInfo, err := el.JSContext.StreamInfo(common.JetStreamStreamName)
+	jetstreamConn := el.EventBusConn.(*eventsource.JetstreamSourceConn)
+
+	if jetstreamConn.JSContext == nil {
+		log.Warnw("JetStream context not initialized, treating as unavailable to prevent message loss",
+			zap.String("eventSource", el.GetEventSourceName()),
+			zap.String("eventName", el.GetEventName()))
+		return true
+	}
+
+	// Use the current connection's JSContext (automatically updated on reconnection)
+	streamInfo, err := jetstreamConn.JSContext.StreamInfo(common.JetStreamStreamName)
 	if err != nil {
 		// If we can't check capacity, treat as unavailable to prevent message loss
 		log.Warnw("Failed to get stream info, treating as unavailable to prevent message loss",
@@ -162,33 +175,38 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 
 		// Check event bus capacity before polling if enabled
 		if sqsEventSource.SkipPollingWhenEventBusFull {
-			if el.isEventBusFull(log) {
-				consecutiveFullChecks++
+			// Verify we have a JetStream connection before checking capacity
+			if el.EventBusConn != nil && !el.EventBusConn.IsClosed() {
+				if _, ok := el.EventBusConn.(*eventsource.JetstreamSourceConn); ok {
+					if el.isEventBusFull(log) {
+						consecutiveFullChecks++
 
-				// Log warning every 10 minutes (60 checks * 10 seconds) when bus stays full
-				if consecutiveFullChecks%60 == 0 {
-					log.Warnw("EventBus has been full for extended period",
-						zap.String("eventSource", el.GetEventSourceName()),
-						zap.String("eventName", el.GetEventName()),
-						zap.Duration("duration", time.Duration(consecutiveFullChecks*10)*time.Second),
-						zap.Int("consecutiveChecks", consecutiveFullChecks))
-				} else {
-					log.Infow("EventBus is full, skipping SQS poll",
-						zap.String("eventSource", el.GetEventSourceName()),
-						zap.String("eventName", el.GetEventName()))
+						// Log warning every 10 minutes (60 checks * 10 seconds) when bus stays full
+						if consecutiveFullChecks%60 == 0 {
+							log.Warnw("EventBus has been full for extended period",
+								zap.String("eventSource", el.GetEventSourceName()),
+								zap.String("eventName", el.GetEventName()),
+								zap.Duration("duration", time.Duration(consecutiveFullChecks*10)*time.Second),
+								zap.Int("consecutiveChecks", consecutiveFullChecks))
+						} else {
+							log.Infow("EventBus is full, skipping SQS poll",
+								zap.String("eventSource", el.GetEventSourceName()),
+								zap.String("eventName", el.GetEventName()))
+						}
+
+						time.Sleep(10 * time.Second) // Wait before checking capacity again
+						continue
+					}
+
+					// Reset counter when capacity becomes available
+					if consecutiveFullChecks > 0 {
+						log.Infow("EventBus capacity available again, resuming SQS polling",
+							zap.String("eventSource", el.GetEventSourceName()),
+							zap.String("eventName", el.GetEventName()),
+							zap.Duration("wasFull", time.Duration(consecutiveFullChecks*10)*time.Second))
+						consecutiveFullChecks = 0
+					}
 				}
-
-				time.Sleep(10 * time.Second) // Wait before checking capacity again
-				continue
-			}
-
-			// Reset counter when capacity becomes available
-			if consecutiveFullChecks > 0 {
-				log.Infow("EventBus capacity available again, resuming SQS polling",
-					zap.String("eventSource", el.GetEventSourceName()),
-					zap.String("eventName", el.GetEventName()),
-					zap.Duration("wasFull", time.Duration(consecutiveFullChecks*10)*time.Second))
-				consecutiveFullChecks = 0
 			}
 		}
 
