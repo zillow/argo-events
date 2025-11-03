@@ -189,7 +189,11 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 								zap.String("eventName", el.GetEventName()))
 						}
 
-						time.Sleep(10 * time.Second) // Wait before checking capacity again
+						waitSeconds := sqsEventSource.EventBusFullWaitSeconds
+						if waitSeconds <= 0 {
+							waitSeconds = 10
+						}
+						time.Sleep(time.Duration(waitSeconds) * time.Second)
 						continue
 					}
 

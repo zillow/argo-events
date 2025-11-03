@@ -95,6 +95,11 @@ spec:
       # Skip polling SQS when event bus is at capacity
       # Recommended: true (default: false)
       skipPollingWhenEventBusFull: true
+
+      # Wait duration (in seconds) between EventBus capacity checks when full
+      # Default: 10 seconds
+      # Optional: Configure to adjust check frequency based on your needs
+      eventBusFullWaitSeconds: 10
 ```
 
 **Benefits:**

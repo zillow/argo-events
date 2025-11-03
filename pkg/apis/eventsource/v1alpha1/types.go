@@ -725,6 +725,10 @@ type SQSEventSource struct {
 	// SkipPollingWhenEventBusFull skips polling SQS when event bus is at capacity
 	// +optional
 	SkipPollingWhenEventBusFull bool `json:"skipPollingWhenEventBusFull,omitempty" protobuf:"varint,14,opt,name=skipPollingWhenEventBusFull"`
+	// EventBusFullWaitSeconds specifies the duration (in seconds) to wait before checking EventBus capacity again when it is full.
+	// The default value is 10 seconds.
+	// +optional
+	EventBusFullWaitSeconds int64 `json:"eventBusFullWaitSeconds,omitempty" protobuf:"varint,15,opt,name=eventBusFullWaitSeconds"`
 }
 
 // PubSubEventSource refers to event-source for GCP PubSub related events.
