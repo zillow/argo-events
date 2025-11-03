@@ -163,7 +163,7 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 		log.Info("Capacity-based polling control enabled - will check event bus capacity before each poll")
 	}
 
-	consecutiveFullChecks := 0
+	var eventBusFullStartTime *time.Time
 
 	for {
 		select {
@@ -179,16 +179,11 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 			if el.EventBusConn != nil && !el.EventBusConn.IsClosed() {
 				if _, ok := el.EventBusConn.(*eventsource.JetstreamSourceConn); ok {
 					if el.isEventBusFull(log) {
-						consecutiveFullChecks++
-
-						// Log warning every 10 minutes (60 checks * 10 seconds) when bus stays full
-						if consecutiveFullChecks%60 == 0 {
-							log.Warnw("EventBus has been full for extended period",
-								zap.String("eventSource", el.GetEventSourceName()),
-								zap.String("eventName", el.GetEventName()),
-								zap.Duration("duration", time.Duration(consecutiveFullChecks*10)*time.Second),
-								zap.Int("consecutiveChecks", consecutiveFullChecks))
-						} else {
+						// Track when EventBus becomes full
+						if eventBusFullStartTime == nil {
+							now := time.Now()
+							eventBusFullStartTime = &now
+							el.Metrics.SetEventBusFull(el.GetEventSourceName(), el.GetEventName(), true)
 							log.Infow("EventBus is full, skipping SQS poll",
 								zap.String("eventSource", el.GetEventSourceName()),
 								zap.String("eventName", el.GetEventName()))
@@ -198,13 +193,16 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 						continue
 					}
 
-					// Reset counter when capacity becomes available
-					if consecutiveFullChecks > 0 {
+					// EventBus capacity available - record duration if it was full
+					if eventBusFullStartTime != nil {
+						duration := time.Since(*eventBusFullStartTime)
+						el.Metrics.EventBusFullDuration(el.GetEventSourceName(), el.GetEventName(), duration.Seconds())
+						el.Metrics.SetEventBusFull(el.GetEventSourceName(), el.GetEventName(), false)
 						log.Infow("EventBus capacity available again, resuming SQS polling",
 							zap.String("eventSource", el.GetEventSourceName()),
 							zap.String("eventName", el.GetEventName()),
-							zap.Duration("wasFull", time.Duration(consecutiveFullChecks*10)*time.Second))
-						consecutiveFullChecks = 0
+							zap.Duration("wasFull", duration))
+						eventBusFullStartTime = nil
 					}
 				}
 			}
