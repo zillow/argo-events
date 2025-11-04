@@ -212,7 +212,12 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 			}
 		}
 
-		messages, err := fetchMessages(ctx, sqsClient, *queueURL.QueueUrl, 10, sqsEventSource.WaitTimeSeconds)
+		batchSize := sqsEventSource.BatchSize
+		if batchSize <= 0 || batchSize > 10 {
+			batchSize = 10 // SQS maximum is 10
+		}
+
+		messages, err := fetchMessages(ctx, sqsClient, *queueURL.QueueUrl, batchSize, sqsEventSource.WaitTimeSeconds)
 		if err != nil {
 			log.Errorw("failed to get messages from SQS", zap.Error(err))
 			awsError, ok := err.(awserr.Error)

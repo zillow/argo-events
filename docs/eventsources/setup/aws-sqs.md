@@ -100,6 +100,11 @@ spec:
       # Default: 10 seconds
       # Optional: Configure to adjust check frequency based on your needs
       eventBusFullWaitSeconds: 10
+
+      # SQS batch size: number of messages to fetch per ReceiveMessage call
+      # Valid values: 1 to 10. Default: 10
+      # Optional
+      batchSize: 10
 ```
 
 **Benefits:**

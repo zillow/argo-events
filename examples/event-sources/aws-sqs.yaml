@@ -27,6 +27,10 @@ spec:
       # The duration (in seconds) for which the call waits for a message to arrive in the queue before returning.
       # MUST BE > 0 AND <= 20
       waitTimeSeconds: 20
+      # The number of messages to fetch per SQS ReceiveMessage call (batch size).
+      # Valid values: 1 to 10. Defaults to 10 if not specified.
+      # +optional
+      batchSize: 10
       
       # CAPACITY-BASED POLLING CONTROL
       # Skip polling SQS when event bus is at capacity

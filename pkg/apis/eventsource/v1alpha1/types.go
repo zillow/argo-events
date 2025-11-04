@@ -729,6 +729,10 @@ type SQSEventSource struct {
 	// The default value is 10 seconds.
 	// +optional
 	EventBusFullWaitSeconds int64 `json:"eventBusFullWaitSeconds,omitempty" protobuf:"varint,15,opt,name=eventBusFullWaitSeconds"`
+	// BatchSize is the number of messages to fetch per SQS ReceiveMessage call (SQS batch size).
+	// Valid values: 1 to 10. Defaults to 10.
+	// +optional
+	BatchSize int64 `json:"batchSize,omitempty" protobuf:"varint,16,opt,name=batchSize"`
 }
 
 // PubSubEventSource refers to event-source for GCP PubSub related events.
