@@ -518,6 +518,16 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 				// Continue starting other event services instead of failing all of them
 				continue
 			}
+			
+			// Set EventBus connection for SQS event sources to enable capacity checking
+			// The connection reference is automatically updated on reconnection
+			if sqsServer, ok := server.(*awssqs.EventListener); ok {
+				sqsServer.SetEventBusConnection(e.eventBusConn)
+				logger.Debugw("Set EventBus connection for SQS event source",
+					zap.String("eventSource", server.GetEventSourceName()),
+					zap.String("eventName", server.GetEventName()))
+			}
+			
 			wg.Add(1)
 			go func(s EventingServer) {
 				defer wg.Done()

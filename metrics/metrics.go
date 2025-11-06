@@ -43,6 +43,8 @@ type Metrics struct {
 	eventsSentFailed        *prometheus.CounterVec
 	eventsProcessingFailed  *prometheus.CounterVec
 	eventProcessingDuration *prometheus.SummaryVec
+	eventBusFullDuration    *prometheus.SummaryVec
+	eventBusFull            *prometheus.GaugeVec
 	actionTriggered         *prometheus.CounterVec
 	actionFailed            *prometheus.CounterVec
 	actionRetriesFailed     *prometheus.CounterVec
@@ -93,6 +95,22 @@ func NewMetrics(namespace string) *Metrics {
 				labelNamespace: namespace,
 			},
 		}, []string{labelEventSourceName, labelEventName}),
+		eventBusFullDuration: prometheus.NewSummaryVec(prometheus.SummaryOpts{
+			Namespace: prefix,
+			Name:      "eventbus_full_duration_seconds",
+			Help:      "Summary of durations (in seconds) that the EventBus was at capacity and SQS polling was skipped. https://argoproj.github.io/argo-events/metrics/#argo_events_eventbus_full_duration_seconds",
+			ConstLabels: prometheus.Labels{
+				labelNamespace: namespace,
+			},
+		}, []string{labelEventSourceName, labelEventName}),
+		eventBusFull: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: prefix,
+			Name:      "eventbus_full",
+			Help:      "Current state of EventBus capacity: 1 if full, 0 if available. Used for alerting when EventBus is full for extended periods. https://argoproj.github.io/argo-events/metrics/#argo_events_eventbus_full",
+			ConstLabels: prometheus.Labels{
+				labelNamespace: namespace,
+			},
+		}, []string{labelEventSourceName, labelEventName}),
 		actionTriggered: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: prefix,
 			Name:      "action_triggered_total",
@@ -134,6 +152,8 @@ func (m *Metrics) Collect(ch chan<- prometheus.Metric) {
 	m.eventsSentFailed.Collect(ch)
 	m.eventsProcessingFailed.Collect(ch)
 	m.eventProcessingDuration.Collect(ch)
+	m.eventBusFullDuration.Collect(ch)
+	m.eventBusFull.Collect(ch)
 	m.actionTriggered.Collect(ch)
 	m.actionFailed.Collect(ch)
 	m.actionRetriesFailed.Collect(ch)
@@ -146,6 +166,8 @@ func (m *Metrics) Describe(ch chan<- *prometheus.Desc) {
 	m.eventsSentFailed.Describe(ch)
 	m.eventsProcessingFailed.Describe(ch)
 	m.eventProcessingDuration.Describe(ch)
+	m.eventBusFullDuration.Describe(ch)
+	m.eventBusFull.Describe(ch)
 	m.actionTriggered.Describe(ch)
 	m.actionFailed.Describe(ch)
 	m.actionRetriesFailed.Describe(ch)
@@ -174,6 +196,18 @@ func (m *Metrics) EventProcessingFailed(eventSourceName, eventName string) {
 
 func (m *Metrics) EventProcessingDuration(eventSourceName, eventName string, num float64) {
 	m.eventProcessingDuration.WithLabelValues(eventSourceName, eventName).Observe(num)
+}
+
+func (m *Metrics) EventBusFullDuration(eventSourceName, eventName string, durationSeconds float64) {
+	m.eventBusFullDuration.WithLabelValues(eventSourceName, eventName).Observe(durationSeconds)
+}
+
+func (m *Metrics) SetEventBusFull(eventSourceName, eventName string, isFull bool) {
+	if isFull {
+		m.eventBusFull.WithLabelValues(eventSourceName, eventName).Set(1)
+	} else {
+		m.eventBusFull.WithLabelValues(eventSourceName, eventName).Set(0)
+	}
 }
 
 func (m *Metrics) ActionTriggered(sensorName, triggerName string) {
