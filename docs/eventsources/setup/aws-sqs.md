@@ -22,7 +22,7 @@ The structure of an event dispatched by the event-source over the eventbus looks
                  // see Amazon SQS Message Attributes
                  // (https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-attributes.html)
                  // in the Amazon Simple Queue Service Developer Guide.
-                 "messageAttributes": "message attributes", 
+                 "messageAttributes": "message attributes",
                    "body": "Body is the message data",
                 }
             }
@@ -65,6 +65,57 @@ The structure of an event dispatched by the event-source over the eventbus looks
         aws sqs send-message --queue-url https://sqs.us-east-1.amazonaws.com/XXXXX/test --message-body '{"message": "hello"}'
 
 1. Once a message is published, an argo workflow will be triggered. Run `argo list` to find the workflow.
+
+## Configuration Options
+
+### Capacity-Based Polling Control
+
+The `skipPollingWhenEventBusFull` option enables intelligent backpressure handling to prevent message loss when the event bus is at capacity.
+
+**How it works:**
+
+- When enabled, the event source checks the JetStream event bus capacity before each SQS poll
+- If the event bus is full or unavailable, SQS polling is skipped
+- Messages remain in SQS with their visibility timeout intact
+- Polling automatically resumes when event bus capacity becomes available
+- Prevents SQS messages from being moved to DLQ due to event bus capacity issues
+
+**Configuration:**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: aws-sqs
+spec:
+  sqs:
+    example:
+      # ... other configuration ...
+
+      # Skip polling SQS when event bus is at capacity
+      # Recommended: true (default: false)
+      skipPollingWhenEventBusFull: true
+
+      # Wait duration (in seconds) between EventBus capacity checks when full
+      # Default: 10 seconds
+      # Optional: Configure to adjust check frequency based on your needs
+      eventBusFullWaitSeconds: 10
+
+      # SQS batch size: number of messages to fetch per ReceiveMessage call
+      # Valid values: 1 to 10. Default: 10
+      # Optional
+      batchSize: 10
+```
+
+**Benefits:**
+
+- **Prevents message loss**: Messages stay in SQS when the event bus can't accept them
+- **Reduces API calls**: Avoids unnecessary SQS polling when downstream is saturated
+- **Self-healing**: Automatically resumes when capacity is available
+
+**Recommendations:**
+
+- Enable this option when using JetStream event bus with limited capacity
 
 ## Troubleshoot
 

@@ -683,6 +683,17 @@ type SQSEventSource struct {
 	// SessionToken refers to K8s secret containing AWS temporary credentials(STS) session token
 	// +optional
 	SessionToken *corev1.SecretKeySelector `json:"sessionToken,omitempty" protobuf:"bytes,13,opt,name=sessionToken"`
+	// SkipPollingWhenEventBusFull skips polling SQS when event bus is at capacity
+	// +optional
+	SkipPollingWhenEventBusFull bool `json:"skipPollingWhenEventBusFull,omitempty" protobuf:"varint,14,opt,name=skipPollingWhenEventBusFull"`
+	// EventBusFullWaitSeconds specifies the duration (in seconds) to wait before checking EventBus capacity again when it is full.
+	// The default value is 10 seconds.
+	// +optional
+	EventBusFullWaitSeconds int64 `json:"eventBusFullWaitSeconds,omitempty" protobuf:"varint,15,opt,name=eventBusFullWaitSeconds"`
+	// BatchSize is the number of messages to fetch per SQS ReceiveMessage call (SQS batch size).
+	// Valid values: 1 to 10. Defaults to 10.
+	// +optional
+	BatchSize int64 `json:"batchSize,omitempty" protobuf:"varint,16,opt,name=batchSize"`
 }
 
 // PubSubEventSource refers to event-source for GCP PubSub related events.
