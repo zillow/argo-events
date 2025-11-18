@@ -212,26 +212,7 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 			}
 
 			actionFunc := func(events map[string]cloudevents.Event) {
-				retryStrategy := trigger.RetryStrategy
-				if retryStrategy == nil {
-					retryStrategy = &apicommon.Backoff{Steps: 1}
-				}
-				resourceRetryStrategy := trigger.ResourceRetryStrategy
-				err := common.DoWithResourceAwareRetry(retryStrategy, resourceRetryStrategy, func() error {
-					return sensorCtx.triggerActions(ctx, sensor, events, trigger)
-				})
-				if err != nil {
-					triggerLogger.Warnf("failed to trigger actions, %v", err)
-					sensorCtx.metrics.ActionRetriesFailed(sensor.Name, trigger.Template.Name)
-					if trigger.DlqTrigger != nil {
-						triggerLogger.Debugf("invoking dlqTrigger")
-						dlqErr := sensorCtx.triggerActions(ctx, sensor, events, *trigger.DlqTrigger)
-						if dlqErr != nil {
-							triggerLogger.Errorf("failed to trigger dlqTrigger, %v", dlqErr)
-							sensorCtx.metrics.ActionRetriesFailed(sensor.Name, trigger.DlqTrigger.Template.Name)
-						}
-					}
-				}
+				sensorCtx.triggerActions(ctx, sensor, events, trigger)
 			}
 
 			var subLock uint32
@@ -377,11 +358,33 @@ func (sensorCtx *SensorContext) triggerWithRateLimit(ctx context.Context, sensor
 	}
 
 	log := logging.FromContext(ctx)
-	if err := sensorCtx.triggerOne(ctx, sensor, trigger, eventsMapping, depNames, eventIDs, log); err != nil {
+	
+	// Use resource-aware retry: detect quota errors and use different retry strategy
+	retryStrategy := trigger.RetryStrategy
+	if retryStrategy == nil {
+		retryStrategy = &apicommon.Backoff{Steps: 1}
+	}
+	resourceRetryStrategy := trigger.ResourceRetryStrategy
+	
+	err := common.DoWithResourceAwareRetry(retryStrategy, resourceRetryStrategy, func() error {
+		return sensorCtx.triggerOne(ctx, sensor, trigger, eventsMapping, depNames, eventIDs, log)
+	})
+	
+	if err != nil {
 		// Log the error, and let it continue
 		log.Errorw("Failed to execute a trigger", zap.Error(err), zap.String(logging.LabelTriggerName, trigger.Template.Name),
 			zap.Any("triggeredBy", depNames), zap.Any("triggeredByEvents", eventIDs))
 		sensorCtx.metrics.ActionFailed(sensor.Name, trigger.Template.Name)
+		
+		// If all retries exhausted and DLQ is configured, invoke DLQ trigger
+		if trigger.DlqTrigger != nil {
+			log.Debugf("All retries exhausted, invoking DLQ trigger")
+			dlqErr := sensorCtx.triggerOne(ctx, sensor, *trigger.DlqTrigger, eventsMapping, depNames, eventIDs, log)
+			if dlqErr != nil {
+				log.Errorw("Failed to execute DLQ trigger", zap.Error(dlqErr), zap.String(logging.LabelTriggerName, trigger.DlqTrigger.Template.Name))
+				sensorCtx.metrics.ActionFailed(sensor.Name, trigger.DlqTrigger.Template.Name)
+			}
+		}
 	} else {
 		sensorCtx.metrics.ActionTriggered(sensor.Name, trigger.Template.Name)
 	}
