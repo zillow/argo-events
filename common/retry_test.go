@@ -138,3 +138,110 @@ func TestConvert2WaitBackoff(t *testing.T) {
 		Steps:    2,
 	}, *waitBackoff)
 }
+
+func TestIsResourceConstraintError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "quota exceeded forbidden error",
+			err:      errors.NewForbidden(v1alpha1.Resource("workflows"), "test", fmt.Errorf("exceeded quota: workflow-limit")),
+			expected: true,
+		},
+		{
+			name:     "regular forbidden error",
+			err:      errors.NewForbidden(v1alpha1.Resource("sensor"), "test", fmt.Errorf("access denied")),
+			expected: false,
+		},
+		{
+			name:     "not found error",
+			err:      errors.NewNotFound(v1alpha1.Resource("sensor"), "test"),
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsResourceConstraintError(tt.err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDoWithResourceAwareRetry(t *testing.T) {
+	t.Run("successful execution", func(t *testing.T) {
+		callCount := 0
+		err := DoWithResourceAwareRetry(nil, nil, func() error {
+			callCount++
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 1, callCount)
+	})
+
+	t.Run("regular error uses default backoff", func(t *testing.T) {
+		callCount := 0
+		defaultBackoff := &apicommon.Backoff{Steps: 2}
+		err := DoWithResourceAwareRetry(defaultBackoff, nil, func() error {
+			callCount++
+			if callCount < 2 {
+				return fmt.Errorf("regular error")
+			}
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 2, callCount)
+	})
+
+	t.Run("resource constraint error uses resource backoff", func(t *testing.T) {
+		callCount := 0
+		defaultBackoff := &apicommon.Backoff{Steps: 5}
+		resourceBackoff := &apicommon.Backoff{Steps: 2}
+		
+		err := DoWithResourceAwareRetry(defaultBackoff, resourceBackoff, func() error {
+			callCount++
+			if callCount < 2 {
+				return errors.NewForbidden(v1alpha1.Resource("pods"), "test", fmt.Errorf("exceeded quota"))
+			}
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 2, callCount)
+	})
+
+	t.Run("resource constraint error without resource backoff uses default", func(t *testing.T) {
+		callCount := 0
+		defaultBackoff := &apicommon.Backoff{Steps: 2}
+		
+		err := DoWithResourceAwareRetry(defaultBackoff, nil, func() error {
+			callCount++
+			if callCount < 2 {
+				return errors.NewForbidden(v1alpha1.Resource("pods"), "test", fmt.Errorf("exceeded quota"))
+			}
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 2, callCount)
+	})
+
+	t.Run("all retries exhausted", func(t *testing.T) {
+		callCount := 0
+		defaultBackoff := &apicommon.Backoff{Steps: 2}
+		
+		err := DoWithResourceAwareRetry(defaultBackoff, nil, func() error {
+			callCount++
+			return fmt.Errorf("persistent error")
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed after retries")
+		assert.Contains(t, err.Error(), "persistent error")
+		assert.Equal(t, 3, callCount) // Initial attempt + 2 retries
+	})
+}
