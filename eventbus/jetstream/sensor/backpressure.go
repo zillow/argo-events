@@ -89,16 +89,16 @@ func (b *BackpressureWaiter) HasCapacity(ctx context.Context) (bool, error) {
 
 	hasCapacity := usedVal < threshold
 
-	// Only log when at/near capacity to avoid log spam
-	if !hasCapacity {
-		b.logger.Infow("Quota near capacity, will wait before fetching",
-			"quotaName", b.quotaName,
-			"resourceName", b.resourceName,
-			"hard", hardVal,
-			"used", usedVal,
-			"threshold", threshold,
-		)
-	}
+	// TODO: Remove verbose logging after testing is complete
+	// Verbose logging for testing - logs on every check
+	b.logger.Infow("[BACKPRESSURE-TEST] Quota check performed",
+		"quotaName", b.quotaName,
+		"resourceName", b.resourceName,
+		"hard", hardVal,
+		"used", usedVal,
+		"threshold", threshold,
+		"hasCapacity", hasCapacity,
+	)
 
 	return hasCapacity, nil
 }
@@ -134,8 +134,20 @@ func (b *BackpressureWaiter) WaitForCapacity(ctx context.Context) error {
 
 		if hasCapacity {
 			// Clear blocked metric if we were blocked
-			if wasBlocked && b.metrics != nil {
-				b.metrics.SetSensorQuotaBlocked(b.sensorName, b.triggerName, false)
+			if wasBlocked {
+				// TODO: Remove verbose logging after testing is complete
+				b.logger.Infow("[BACKPRESSURE-TEST] Capacity available, resuming message fetch",
+					"quotaName", b.quotaName,
+					"wasBlocked", wasBlocked,
+				)
+				if b.metrics != nil {
+					b.metrics.SetSensorQuotaBlocked(b.sensorName, b.triggerName, false)
+				}
+			} else {
+				// TODO: Remove verbose logging after testing is complete
+				b.logger.Infow("[BACKPRESSURE-TEST] Capacity available, proceeding with fetch",
+					"quotaName", b.quotaName,
+				)
 			}
 			return nil
 		}
@@ -143,12 +155,22 @@ func (b *BackpressureWaiter) WaitForCapacity(ctx context.Context) error {
 		// Mark as blocked on first iteration without capacity
 		if !wasBlocked {
 			wasBlocked = true
+			// TODO: Remove verbose logging after testing is complete
+			b.logger.Warnw("[BACKPRESSURE-TEST] No capacity, blocking message fetch",
+				"quotaName", b.quotaName,
+				"pollInterval", b.pollInterval,
+			)
 			if b.metrics != nil {
 				b.metrics.SetSensorQuotaBlocked(b.sensorName, b.triggerName, true)
 			}
+		} else {
+			// TODO: Remove verbose logging after testing is complete
+			b.logger.Infow("[BACKPRESSURE-TEST] Still blocked, waiting for capacity",
+				"quotaName", b.quotaName,
+				"pollInterval", b.pollInterval,
+			)
 		}
 
-		// HasCapacity already logged the quota state, just wait
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
