@@ -49,6 +49,7 @@ type Metrics struct {
 	actionFailed            *prometheus.CounterVec
 	actionRetriesFailed     *prometheus.CounterVec
 	actionDuration          *prometheus.SummaryVec
+	sensorQuotaBlocked      *prometheus.GaugeVec
 }
 
 // NewMetrics returns a Metrics instance
@@ -143,6 +144,14 @@ func NewMetrics(namespace string) *Metrics {
 				labelNamespace: namespace,
 			},
 		}, []string{labelSensorName, labelTriggerName}),
+		sensorQuotaBlocked: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: prefix,
+			Name:      "sensor_quota_blocked",
+			Help:      "Current state of sensor quota-based backpressure: 1 if blocked waiting for quota capacity, 0 if processing normally. https://argoproj.github.io/argo-events/metrics/#argo_events_sensor_quota_blocked",
+			ConstLabels: prometheus.Labels{
+				labelNamespace: namespace,
+			},
+		}, []string{labelSensorName, labelTriggerName}),
 	}
 }
 
@@ -158,6 +167,7 @@ func (m *Metrics) Collect(ch chan<- prometheus.Metric) {
 	m.actionFailed.Collect(ch)
 	m.actionRetriesFailed.Collect(ch)
 	m.actionDuration.Collect(ch)
+	m.sensorQuotaBlocked.Collect(ch)
 }
 
 func (m *Metrics) Describe(ch chan<- *prometheus.Desc) {
@@ -172,6 +182,7 @@ func (m *Metrics) Describe(ch chan<- *prometheus.Desc) {
 	m.actionFailed.Describe(ch)
 	m.actionRetriesFailed.Describe(ch)
 	m.actionDuration.Describe(ch)
+	m.sensorQuotaBlocked.Describe(ch)
 }
 
 func (m *Metrics) IncRunningServices(eventSourceName string) {
@@ -224,6 +235,15 @@ func (m *Metrics) ActionRetriesFailed(sensorName, triggerName string) {
 
 func (m *Metrics) ActionDuration(sensorName, triggerName string, num float64) {
 	m.actionDuration.WithLabelValues(sensorName, triggerName).Observe(num)
+}
+
+// SetSensorQuotaBlocked sets the sensor quota blocked state for backpressure monitoring
+func (m *Metrics) SetSensorQuotaBlocked(sensorName, triggerName string, isBlocked bool) {
+	if isBlocked {
+		m.sensorQuotaBlocked.WithLabelValues(sensorName, triggerName).Set(1)
+	} else {
+		m.sensorQuotaBlocked.WithLabelValues(sensorName, triggerName).Set(0)
+	}
 }
 
 // Run starts a metrics server

@@ -30,6 +30,7 @@ type JetstreamTriggerConn struct {
 	sourceDepMap         map[string][]string // maps EventSource and EventName to dependency name
 	recentMsgsByID       map[string]*msg     // prevent re-processing the same message as before (map of msg ID to time)
 	recentMsgsByTime     []*msg
+	backpressureWaiter   *BackpressureWaiter // Optional: blocks fetch when quota is near capacity
 }
 
 type msg struct {
@@ -100,6 +101,12 @@ func (conn *JetstreamTriggerConn) String() string {
 		return ""
 	}
 	return fmt.Sprintf("JetstreamTriggerConn{Sensor:%s,Trigger:%s}", conn.sensorName, conn.triggerName)
+}
+
+// SetBackpressureWaiter sets the backpressure waiter for quota-based flow control.
+// When set, pullSubscribe will wait for capacity before fetching messages.
+func (conn *JetstreamTriggerConn) SetBackpressureWaiter(waiter *BackpressureWaiter) {
+	conn.backpressureWaiter = waiter
 }
 
 type jsDeliverConfig struct {
@@ -203,7 +210,7 @@ func (conn *JetstreamTriggerConn) Subscribe(ctx context.Context,
 		}
 
 		pullSubscribeCloseCh[subject] = make(chan struct{})
-		go conn.pullSubscribe(subscriptions[subscriptionIndex], ch, pullSubscribeCloseCh[subject], &wg)
+		go conn.pullSubscribe(ctx, subscriptions[subscriptionIndex], ch, pullSubscribeCloseCh[subject], &wg)
 		wg.Add(1)
 		log.Debug("adding 1 to WaitGroup (pullSubscribe)")
 
@@ -241,6 +248,7 @@ func (conn *JetstreamTriggerConn) shutdownSubscriptions(processMsgsCloseCh chan 
 }
 
 func (conn *JetstreamTriggerConn) pullSubscribe(
+	ctx context.Context,
 	subscription *nats.Subscription,
 	msgChannel chan<- *nats.Msg,
 	closeCh <-chan struct{},
@@ -249,6 +257,17 @@ func (conn *JetstreamTriggerConn) pullSubscribe(
 	var previousErrTime time.Time
 
 	for {
+		// If backpressure is configured, wait for capacity before fetching
+		// This keeps messages safe in JetStream when quota is near capacity
+		if conn.backpressureWaiter != nil {
+			if err := conn.backpressureWaiter.WaitForCapacity(ctx); err != nil {
+				conn.Logger.Warnw("Backpressure wait cancelled", "error", err)
+				wg.Done()
+				conn.Logger.Debug("wg.Done(): pullSubscribe (backpressure cancelled)")
+				return
+			}
+		}
+
 		// call Fetch with timeout
 		msgs, fetchErr := subscription.Fetch(1, nats.MaxWait(time.Second*1))
 		if fetchErr != nil && !errors.Is(fetchErr, nats.ErrTimeout) {

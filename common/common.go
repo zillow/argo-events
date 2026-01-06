@@ -103,6 +103,25 @@ const (
 	LabelSensorName = "sensor-name"
 )
 
+// Backpressure constants for quota-based flow control
+const (
+	// EnvVarBackpressureQuotaName is the ResourceQuota name to check before fetching messages
+	EnvVarBackpressureQuotaName = "BACKPRESSURE_QUOTA_NAME"
+	// EnvVarBackpressureResourceName is the resource name in the quota
+	EnvVarBackpressureResourceName = "BACKPRESSURE_RESOURCE_NAME"
+	// EnvVarBackpressureCapacityRatio is the capacity threshold ratio
+	EnvVarBackpressureCapacityRatio = "BACKPRESSURE_CAPACITY_RATIO"
+	// EnvVarBackpressurePollInterval is the poll interval in seconds when blocked
+	EnvVarBackpressurePollInterval = "BACKPRESSURE_POLL_INTERVAL"
+
+	// DefaultBackpressureResourceName is the default resource to check in quota
+	DefaultBackpressureResourceName = "count/workflows.argoproj.io"
+	// DefaultBackpressureCapacityRatio is the default threshold (0.97 = 3% buffer)
+	DefaultBackpressureCapacityRatio = 0.97
+	// DefaultBackpressurePollInterval is the default poll interval in seconds
+	DefaultBackpressurePollInterval = 30
+)
+
 // EventSource
 const (
 	// EnvVarEventSourceObject refers to the env of based64 encoded eventsource spec

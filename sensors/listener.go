@@ -19,6 +19,8 @@ package sensors
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +33,7 @@ import (
 	"github.com/argoproj/argo-events/common/logging"
 	"github.com/argoproj/argo-events/eventbus"
 	eventbuscommon "github.com/argoproj/argo-events/eventbus/common"
+	jetstreamsensor "github.com/argoproj/argo-events/eventbus/jetstream/sensor"
 	apicommon "github.com/argoproj/argo-events/pkg/apis/common"
 	"github.com/argoproj/argo-events/pkg/apis/sensor/v1alpha1"
 	sensordependencies "github.com/argoproj/argo-events/sensors/dependencies"
@@ -172,6 +175,28 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 				return
 			}
 			defer conn.Close()
+
+			// Configure backpressure if this is a JetStream connection and quota config is provided
+			if jsConn, ok := conn.(*jetstreamsensor.JetstreamTriggerConn); ok {
+				backpressureCfg := sensorCtx.getBackpressureConfig()
+				if backpressureCfg != nil {
+					// Add sensor and trigger names for metrics
+					backpressureCfg.SensorName = sensor.Name
+					backpressureCfg.TriggerName = trigger.Template.Name
+					waiter := jetstreamsensor.NewBackpressureWaiter(
+						sensorCtx.kubeClient,
+						sensorCtx.sensor.Namespace,
+						*backpressureCfg,
+						sensorCtx.metrics,
+						triggerLogger,
+					)
+					jsConn.SetBackpressureWaiter(waiter)
+					triggerLogger.Infow("Backpressure enabled for trigger",
+						"quotaName", backpressureCfg.QuotaName,
+						"capacityRatio", backpressureCfg.CapacityRatio,
+					)
+				}
+			}
 
 			transformFunc := func(depName string, event cloudevents.Event) (*cloudevents.Event, error) {
 				dep, ok := depMapping[depName]
@@ -542,4 +567,44 @@ func unique(stringSlice []string) []string {
 		}
 	}
 	return list
+}
+
+// getBackpressureConfig returns backpressure configuration from environment variables.
+// Returns nil if backpressure is not configured.
+// Environment variables:
+//   - BACKPRESSURE_QUOTA_NAME: Name of the ResourceQuota to check (required)
+//   - BACKPRESSURE_RESOURCE_NAME: Resource name in quota (default: count/workflows.argoproj.io)
+//   - BACKPRESSURE_CAPACITY_RATIO: Ratio of quota to use (default: 0.97 = 3% buffer)
+//   - BACKPRESSURE_POLL_INTERVAL: Interval to poll quota in seconds (default: 30)
+func (sensorCtx *SensorContext) getBackpressureConfig() *jetstreamsensor.BackpressureConfig {
+	quotaName := os.Getenv(common.EnvVarBackpressureQuotaName)
+	if quotaName == "" {
+		return nil // Backpressure not configured
+	}
+
+	resourceName := os.Getenv(common.EnvVarBackpressureResourceName)
+	if resourceName == "" {
+		resourceName = common.DefaultBackpressureResourceName
+	}
+
+	capacityRatio := common.DefaultBackpressureCapacityRatio
+	if ratioStr := os.Getenv(common.EnvVarBackpressureCapacityRatio); ratioStr != "" {
+		if parsed, err := strconv.ParseFloat(ratioStr, 64); err == nil {
+			capacityRatio = parsed
+		}
+	}
+
+	pollInterval := time.Duration(common.DefaultBackpressurePollInterval) * time.Second
+	if intervalStr := os.Getenv(common.EnvVarBackpressurePollInterval); intervalStr != "" {
+		if parsed, err := strconv.Atoi(intervalStr); err == nil {
+			pollInterval = time.Duration(parsed) * time.Second
+		}
+	}
+
+	return &jetstreamsensor.BackpressureConfig{
+		QuotaName:     quotaName,
+		ResourceName:  resourceName,
+		CapacityRatio: capacityRatio,
+		PollInterval:  pollInterval,
+	}
 }
