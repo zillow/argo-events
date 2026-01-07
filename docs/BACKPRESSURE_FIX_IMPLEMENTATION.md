@@ -103,7 +103,7 @@ Sensor gets stuck and requires manual pod restart to recover.
 | `BACKPRESSURE_QUOTA_NAME` | Yes | - | Name of the ResourceQuota to check |
 | `BACKPRESSURE_RESOURCE_NAME` | No | `count/workflows.argoproj.io` | Resource to check in quota |
 | `BACKPRESSURE_CAPACITY_RATIO` | No | `0.97` | Capacity threshold (3% buffer) |
-| `BACKPRESSURE_POLL_INTERVAL` | No | `30s` | How often to poll when blocked |
+| `BACKPRESSURE_POLL_INTERVAL` | No | `30` | How often to poll when blocked (seconds) |
 
 ### Example Sensor Deployment Patch
 
