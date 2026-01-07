@@ -574,7 +574,7 @@ func unique(stringSlice []string) []string {
 // Environment variables:
 //   - BACKPRESSURE_QUOTA_NAME: Name of the ResourceQuota to check (required)
 //   - BACKPRESSURE_RESOURCE_NAME: Resource name in quota (default: count/workflows.argoproj.io)
-//   - BACKPRESSURE_CAPACITY_RATIO: Ratio of quota to use (default: 0.97 = 3% buffer)
+//   - BACKPRESSURE_CAPACITY_RATIO: Ratio of quota to use (default: 0.95 = 5% buffer)
 //   - BACKPRESSURE_POLL_INTERVAL: Interval to poll quota in seconds (default: 30)
 func (sensorCtx *SensorContext) getBackpressureConfig() *jetstreamsensor.BackpressureConfig {
 	quotaName := os.Getenv(common.EnvVarBackpressureQuotaName)

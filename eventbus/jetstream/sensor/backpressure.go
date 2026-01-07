@@ -20,7 +20,7 @@ type BackpressureWaiter struct {
 	namespace     string
 	quotaName     string
 	resourceName  string        // e.g., "count/workflows.argoproj.io"
-	capacityRatio float64       // e.g., 0.97 for 3% buffer
+	capacityRatio float64       // e.g., 0.95 for 5% buffer
 	pollInterval  time.Duration // How often to poll when blocked
 	logger        *zap.SugaredLogger
 	metrics       *metrics.Metrics
@@ -32,7 +32,7 @@ type BackpressureWaiter struct {
 type BackpressureConfig struct {
 	QuotaName     string
 	ResourceName  string        // Default: "count/workflows.argoproj.io"
-	CapacityRatio float64       // Default: 0.97 (3% buffer)
+	CapacityRatio float64       // Default: 0.95 (5% buffer)
 	PollInterval  time.Duration // Default: 30s
 	SensorName    string
 	TriggerName   string
@@ -51,7 +51,7 @@ func NewBackpressureWaiter(
 		config.ResourceName = "count/workflows.argoproj.io"
 	}
 	if config.CapacityRatio <= 0 || config.CapacityRatio > 1 {
-		config.CapacityRatio = 0.97 // 3% buffer by default
+		config.CapacityRatio = 0.95 // 5% buffer by default
 	}
 	if config.PollInterval <= 0 {
 		config.PollInterval = 30 * time.Second

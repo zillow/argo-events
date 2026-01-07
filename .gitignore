@@ -18,4 +18,3 @@ argo-events
 # ignore temp vi files
 *.swo
 *.swp
-docs/BACKPRESSURE_FIX_IMPLEMENTATION.md

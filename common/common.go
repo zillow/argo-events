@@ -116,8 +116,8 @@ const (
 
 	// DefaultBackpressureResourceName is the default resource to check in quota
 	DefaultBackpressureResourceName = "count/workflows.argoproj.io"
-	// DefaultBackpressureCapacityRatio is the default threshold (0.97 = 3% buffer)
-	DefaultBackpressureCapacityRatio = 0.97
+	// DefaultBackpressureCapacityRatio is the default threshold (0.95 = 5% buffer)
+	DefaultBackpressureCapacityRatio = 0.95
 	// DefaultBackpressurePollInterval is the default poll interval in seconds
 	DefaultBackpressurePollInterval = 30
 )
