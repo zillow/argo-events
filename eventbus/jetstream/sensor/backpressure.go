@@ -89,9 +89,8 @@ func (b *BackpressureWaiter) HasCapacity(ctx context.Context) (bool, error) {
 
 	hasCapacity := usedVal < threshold
 
-	// TODO: Remove verbose logging after testing is complete
-	// Verbose logging for testing - logs on every check
-	b.logger.Infow("[BACKPRESSURE-TEST] Quota check performed",
+	// Debug logging - only visible when debug level is enabled
+	b.logger.Debugw("Quota check performed",
 		"quotaName", b.quotaName,
 		"resourceName", b.resourceName,
 		"hard", hardVal,
@@ -135,19 +134,12 @@ func (b *BackpressureWaiter) WaitForCapacity(ctx context.Context) error {
 		if hasCapacity {
 			// Clear blocked metric if we were blocked
 			if wasBlocked {
-				// TODO: Remove verbose logging after testing is complete
-				b.logger.Infow("[BACKPRESSURE-TEST] Capacity available, resuming message fetch",
+				b.logger.Infow("Capacity available, resuming message fetch",
 					"quotaName", b.quotaName,
-					"wasBlocked", wasBlocked,
 				)
 				if b.metrics != nil {
 					b.metrics.SetSensorQuotaBlocked(b.sensorName, b.triggerName, false)
 				}
-			} else {
-				// TODO: Remove verbose logging after testing is complete
-				b.logger.Infow("[BACKPRESSURE-TEST] Capacity available, proceeding with fetch",
-					"quotaName", b.quotaName,
-				)
 			}
 			return nil
 		}
@@ -155,20 +147,13 @@ func (b *BackpressureWaiter) WaitForCapacity(ctx context.Context) error {
 		// Mark as blocked on first iteration without capacity
 		if !wasBlocked {
 			wasBlocked = true
-			// TODO: Remove verbose logging after testing is complete
-			b.logger.Warnw("[BACKPRESSURE-TEST] No capacity, blocking message fetch",
+			b.logger.Infow("Backpressure active, blocking message fetch until capacity available",
 				"quotaName", b.quotaName,
 				"pollInterval", b.pollInterval,
 			)
 			if b.metrics != nil {
 				b.metrics.SetSensorQuotaBlocked(b.sensorName, b.triggerName, true)
 			}
-		} else {
-			// TODO: Remove verbose logging after testing is complete
-			b.logger.Infow("[BACKPRESSURE-TEST] Still blocked, waiting for capacity",
-				"quotaName", b.quotaName,
-				"pollInterval", b.pollInterval,
-			)
 		}
 
 		select {
