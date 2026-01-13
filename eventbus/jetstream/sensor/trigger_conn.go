@@ -266,6 +266,14 @@ func (conn *JetstreamTriggerConn) pullSubscribe(
 				conn.Logger.Debug("wg.Done(): pullSubscribe (backpressure cancelled)")
 				return
 			}
+			// Check if close was requested during backpressure wait
+			select {
+			case <-closeCh:
+				conn.Logger.Info("Close requested after backpressure wait, exiting pullSubscribe")
+				wg.Done()
+				return
+			default:
+			}
 		}
 
 		// call Fetch with timeout

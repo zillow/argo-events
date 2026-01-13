@@ -176,27 +176,8 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 			}
 			defer conn.Close()
 
-			// Configure backpressure if this is a JetStream connection and quota config is provided
-			if jsConn, ok := conn.(*jetstreamsensor.JetstreamTriggerConn); ok {
-				backpressureCfg := sensorCtx.getBackpressureConfig()
-				if backpressureCfg != nil {
-					// Add sensor and trigger names for metrics
-					backpressureCfg.SensorName = sensor.Name
-					backpressureCfg.TriggerName = trigger.Template.Name
-					waiter := jetstreamsensor.NewBackpressureWaiter(
-						sensorCtx.kubeClient,
-						sensorCtx.sensor.Namespace,
-						*backpressureCfg,
-						sensorCtx.metrics,
-						triggerLogger,
-					)
-					jsConn.SetBackpressureWaiter(waiter)
-					triggerLogger.Infow("Backpressure enabled for trigger",
-						"quotaName", backpressureCfg.QuotaName,
-						"capacityRatio", backpressureCfg.CapacityRatio,
-					)
-				}
-			}
+			// Configure backpressure if enabled
+			sensorCtx.setupBackpressure(conn, sensor.Name, trigger.Template.Name, triggerLogger)
 
 			transformFunc := func(depName string, event cloudevents.Event) (*cloudevents.Event, error) {
 				dep, ok := depMapping[depName]
@@ -359,6 +340,9 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 							continue
 						}
 						triggerLogger.Infow("reconnected to EventBus.", zap.Any("connection", conn))
+
+						// Re-setup backpressure on new connection
+						sensorCtx.setupBackpressure(conn, sensor.Name, trigger.Template.Name, triggerLogger)
 
 						if atomic.LoadUint32(&subLock) == 1 {
 							triggerLogger.Debug("acquired sublock, instructing trigger to shutdown subscription")
@@ -607,4 +591,38 @@ func (sensorCtx *SensorContext) getBackpressureConfig() *jetstreamsensor.Backpre
 		CapacityRatio: capacityRatio,
 		PollInterval:  pollInterval,
 	}
+}
+
+// setupBackpressure configures backpressure on a JetStream connection if enabled.
+// Called from both initial connection and reconnection paths.
+func (sensorCtx *SensorContext) setupBackpressure(
+	conn eventbuscommon.TriggerConnection,
+	sensorName string,
+	triggerName string,
+	logger *zap.SugaredLogger,
+) {
+	jsConn, ok := conn.(*jetstreamsensor.JetstreamTriggerConn)
+	if !ok {
+		return // Not a JetStream connection
+	}
+
+	backpressureCfg := sensorCtx.getBackpressureConfig()
+	if backpressureCfg == nil {
+		return // Backpressure not configured
+	}
+
+	backpressureCfg.SensorName = sensorName
+	backpressureCfg.TriggerName = triggerName
+	waiter := jetstreamsensor.NewBackpressureWaiter(
+		sensorCtx.kubeClient,
+		sensorCtx.sensor.Namespace,
+		*backpressureCfg,
+		sensorCtx.metrics,
+		logger,
+	)
+	jsConn.SetBackpressureWaiter(waiter)
+	logger.Infow("Backpressure enabled",
+		"quotaName", backpressureCfg.QuotaName,
+		"capacityRatio", backpressureCfg.CapacityRatio,
+	)
 }
