@@ -556,12 +556,12 @@ func unique(stringSlice []string) []string {
 // getBackpressureConfig returns backpressure configuration from environment variables.
 // Returns nil if backpressure is not configured.
 // Environment variables:
-//   - BACKPRESSURE_QUOTA_NAME: Name of the ResourceQuota to check (required)
+//   - RESOURCE_QUOTA_NAME: Name of the ResourceQuota to check (required)
 //   - BACKPRESSURE_RESOURCE_NAME: Resource name in quota (default: count/workflows.argoproj.io)
 //   - BACKPRESSURE_CAPACITY_RATIO: Ratio of quota to use (default: 0.95 = 5% buffer)
 //   - BACKPRESSURE_POLL_INTERVAL: Interval to poll quota in seconds (default: 30)
 func (sensorCtx *SensorContext) getBackpressureConfig() *jetstreamsensor.BackpressureConfig {
-	quotaName := os.Getenv(common.EnvVarBackpressureQuotaName)
+	quotaName := os.Getenv(common.EnvVarResourceQuotaName)
 	if quotaName == "" {
 		return nil // Backpressure not configured
 	}

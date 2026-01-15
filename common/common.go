@@ -105,8 +105,8 @@ const (
 
 // Backpressure constants for quota-based flow control
 const (
-	// EnvVarBackpressureQuotaName is the ResourceQuota name to check before fetching messages
-	EnvVarBackpressureQuotaName = "BACKPRESSURE_QUOTA_NAME"
+	// EnvVarResourceQuotaName is the ResourceQuota name to check before fetching messages
+	EnvVarResourceQuotaName = "RESOURCE_QUOTA_NAME"
 	// EnvVarBackpressureResourceName is the resource name in the quota
 	EnvVarBackpressureResourceName = "BACKPRESSURE_RESOURCE_NAME"
 	// EnvVarBackpressureCapacityRatio is the capacity threshold ratio
