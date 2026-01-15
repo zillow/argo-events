@@ -19,6 +19,8 @@ package sensors
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +33,7 @@ import (
 	"github.com/argoproj/argo-events/common/logging"
 	"github.com/argoproj/argo-events/eventbus"
 	eventbuscommon "github.com/argoproj/argo-events/eventbus/common"
+	jetstreamsensor "github.com/argoproj/argo-events/eventbus/jetstream/sensor"
 	apicommon "github.com/argoproj/argo-events/pkg/apis/common"
 	"github.com/argoproj/argo-events/pkg/apis/sensor/v1alpha1"
 	sensordependencies "github.com/argoproj/argo-events/sensors/dependencies"
@@ -172,6 +175,9 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 				return
 			}
 			defer conn.Close()
+
+			// Configure backpressure if enabled
+			sensorCtx.setupBackpressure(conn, sensor.Name, trigger.Template.Name, triggerLogger)
 
 			transformFunc := func(depName string, event cloudevents.Event) (*cloudevents.Event, error) {
 				dep, ok := depMapping[depName]
@@ -334,6 +340,9 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 							continue
 						}
 						triggerLogger.Infow("reconnected to EventBus.", zap.Any("connection", conn))
+
+						// Re-setup backpressure on new connection
+						sensorCtx.setupBackpressure(conn, sensor.Name, trigger.Template.Name, triggerLogger)
 
 						if atomic.LoadUint32(&subLock) == 1 {
 							triggerLogger.Debug("acquired sublock, instructing trigger to shutdown subscription")
@@ -542,4 +551,78 @@ func unique(stringSlice []string) []string {
 		}
 	}
 	return list
+}
+
+// getBackpressureConfig returns backpressure configuration from environment variables.
+// Returns nil if backpressure is not configured.
+// Environment variables:
+//   - RESOURCE_QUOTA_NAME: Name of the ResourceQuota to check (required)
+//   - BACKPRESSURE_RESOURCE_NAME: Resource name in quota (default: count/workflows.argoproj.io)
+//   - BACKPRESSURE_CAPACITY_RATIO: Ratio of quota to use (default: 0.95 = 5% buffer)
+//   - BACKPRESSURE_POLL_INTERVAL: Interval to poll quota in seconds (default: 30)
+func (sensorCtx *SensorContext) getBackpressureConfig() *jetstreamsensor.BackpressureConfig {
+	quotaName := os.Getenv(common.EnvVarResourceQuotaName)
+	if quotaName == "" {
+		return nil // Backpressure not configured
+	}
+
+	resourceName := os.Getenv(common.EnvVarBackpressureResourceName)
+	if resourceName == "" {
+		resourceName = common.DefaultBackpressureResourceName
+	}
+
+	capacityRatio := common.DefaultBackpressureCapacityRatio
+	if ratioStr := os.Getenv(common.EnvVarBackpressureCapacityRatio); ratioStr != "" {
+		if parsed, err := strconv.ParseFloat(ratioStr, 64); err == nil {
+			capacityRatio = parsed
+		}
+	}
+
+	pollInterval := time.Duration(common.DefaultBackpressurePollInterval) * time.Second
+	if intervalStr := os.Getenv(common.EnvVarBackpressurePollInterval); intervalStr != "" {
+		if parsed, err := strconv.Atoi(intervalStr); err == nil {
+			pollInterval = time.Duration(parsed) * time.Second
+		}
+	}
+
+	return &jetstreamsensor.BackpressureConfig{
+		QuotaName:     quotaName,
+		ResourceName:  resourceName,
+		CapacityRatio: capacityRatio,
+		PollInterval:  pollInterval,
+	}
+}
+
+// setupBackpressure configures backpressure on a JetStream connection if enabled.
+// Called from both initial connection and reconnection paths.
+func (sensorCtx *SensorContext) setupBackpressure(
+	conn eventbuscommon.TriggerConnection,
+	sensorName string,
+	triggerName string,
+	logger *zap.SugaredLogger,
+) {
+	jsConn, ok := conn.(*jetstreamsensor.JetstreamTriggerConn)
+	if !ok {
+		return // Not a JetStream connection
+	}
+
+	backpressureCfg := sensorCtx.getBackpressureConfig()
+	if backpressureCfg == nil {
+		return // Backpressure not configured
+	}
+
+	backpressureCfg.SensorName = sensorName
+	backpressureCfg.TriggerName = triggerName
+	waiter := jetstreamsensor.NewBackpressureWaiter(
+		sensorCtx.kubeClient,
+		sensorCtx.sensor.Namespace,
+		*backpressureCfg,
+		sensorCtx.metrics,
+		logger,
+	)
+	jsConn.SetBackpressureWaiter(waiter)
+	logger.Infow("Backpressure enabled",
+		"quotaName", backpressureCfg.QuotaName,
+		"capacityRatio", backpressureCfg.CapacityRatio,
+	)
 }
