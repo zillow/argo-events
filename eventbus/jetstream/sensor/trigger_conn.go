@@ -266,7 +266,12 @@ func (conn *JetstreamTriggerConn) pullSubscribe(
 				conn.Logger.Debug("wg.Done(): pullSubscribe (backpressure cancelled)")
 				return
 			}
-			// Check if close was requested during backpressure wait
+			// Check if close was requested during backpressure wait.
+			// When blocked in WaitForCapacity() (sleeping for up to 30 seconds waiting for quota),
+			// if the EventBus connection dies, the reconnection logic sends a signal to closeCh
+			// to close the old subscription. But since we were blocked inside WaitForCapacity(),
+			// we don't see the signal until the sleep ends. By then, the old subscription is stale.
+			// This check ensures we exit cleanly if connection dropped during the wait.
 			select {
 			case <-closeCh:
 				conn.Logger.Info("Close requested after backpressure wait, exiting pullSubscribe")
