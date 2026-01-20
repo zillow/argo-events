@@ -105,7 +105,7 @@ func (el *EventListener) isEventBusFull(log *zap.SugaredLogger) bool {
 
 	// Check if stream is at capacity based on MaxMsgs
 	if streamInfo.Config.MaxMsgs > 0 && streamInfo.State.Msgs >= uint64(streamInfo.Config.MaxMsgs) {
-		log.Infow("EventBus at capacity - MaxMsgs limit reached",
+		log.Debugw("EventBus at capacity - MaxMsgs limit reached",
 			zap.String("eventSource", el.GetEventSourceName()),
 			zap.String("eventName", el.GetEventName()),
 			zap.Uint64("currentMsgs", streamInfo.State.Msgs),
@@ -176,7 +176,7 @@ func (el *EventListener) StartListening(ctx context.Context, dispatch func([]byt
 		// Check event bus capacity before polling if enabled
 		if sqsEventSource.SkipPollingWhenEventBusFull {
 			// Verify we have a JetStream connection before checking capacity
-			if el.EventBusConn != nil && !el.EventBusConn.IsClosed() {
+			if el.EventBusConn != nil {
 				if _, ok := el.EventBusConn.(*eventsource.JetstreamSourceConn); ok {
 					if el.isEventBusFull(log) {
 						// Track when EventBus becomes full

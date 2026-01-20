@@ -474,6 +474,8 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 	ctx, cancel := context.WithCancel(ctx)
 	connWG := &sync.WaitGroup{}
 
+	sqsListeners := make([]*awssqs.EventListener, 0)
+
 	// Daemon to reconnect
 	connWG.Add(1)
 	go func() {
@@ -502,6 +504,10 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 						continue
 					}
 					logger.Info("reconnected to eventbus successfully")
+
+					for _, sqsServer := range sqsListeners {
+						sqsServer.SetEventBusConnection(e.eventBusConn)
+					}
 				}
 			}
 		}
@@ -520,9 +526,9 @@ func (e *EventSourceAdaptor) run(ctx context.Context, servers map[apicommon.Even
 			}
 			
 			// Set EventBus connection for SQS event sources to enable capacity checking
-			// The connection reference is automatically updated on reconnection
 			if sqsServer, ok := server.(*awssqs.EventListener); ok {
 				sqsServer.SetEventBusConnection(e.eventBusConn)
+				sqsListeners = append(sqsListeners, sqsServer)
 				logger.Debugw("Set EventBus connection for SQS event source",
 					zap.String("eventSource", server.GetEventSourceName()),
 					zap.String("eventName", server.GetEventName()))
