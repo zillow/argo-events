@@ -222,8 +222,7 @@ func (sensorCtx *SensorContext) listenEvents(ctx context.Context) error {
 				if retryStrategy == nil {
 					retryStrategy = &apicommon.Backoff{Steps: 1}
 				}
-				resourceRetryStrategy := trigger.ResourceRetryStrategy
-				err := common.DoWithResourceAwareRetry(retryStrategy, resourceRetryStrategy, func() error {
+				err := common.DoWithRetry(retryStrategy, func() error {
 					return sensorCtx.triggerActions(ctx, sensor, events, trigger)
 				})
 				if err != nil {
