@@ -1295,11 +1295,6 @@ func (in *Trigger) DeepCopyInto(out *Trigger) {
 		*out = new(common.Backoff)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ResourceRetryStrategy != nil {
-		in, out := &in.ResourceRetryStrategy, &out.ResourceRetryStrategy
-		*out = new(common.Backoff)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.RateLimit != nil {
 		in, out := &in.RateLimit, &out.RateLimit
 		*out = new(RateLimit)

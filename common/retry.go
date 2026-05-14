@@ -18,7 +18,6 @@ package common
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -47,14 +46,6 @@ func IsRetryableKubeAPIError(err error) bool {
 		return false
 	}
 	return true
-}
-
-// IsResourceConstraintError returns true if the error is a ResourceQuota error
-func IsResourceConstraintError(err error) bool {
-	if apierr.IsForbidden(err) {
-		return strings.Contains(err.Error(), "exceeded quota")
-	}
-	return false
 }
 
 // Convert2WaitBackoff converts to a wait backoff option
@@ -117,45 +108,6 @@ func DoWithRetry(backoff *apicommon.Backoff, f func() error) error {
 		}
 		return true, nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed after retries: %w", err)
-	}
-	return nil
-}
-
-// DoWithResourceAwareRetry performs retry with different strategies based on error type
-// Uses resourceBackoff for resource constraint errors (quota, limits), defaultBackoff for others
-func DoWithResourceAwareRetry(defaultBackoff *apicommon.Backoff, resourceBackoff *apicommon.Backoff, f func() error) error {
-	if defaultBackoff == nil {
-		defaultBackoff = &DefaultBackoff
-	}
-
-	// Try the function once to determine error type
-	err := f()
-	if err == nil {
-		return nil
-	}
-
-	// Select retry strategy based on error type
-	strategy := defaultBackoff
-	if IsResourceConstraintError(err) && resourceBackoff != nil {
-		strategy = resourceBackoff
-	}
-
-	// Convert to wait backoff
-	b, convErr := Convert2WaitBackoff(strategy)
-	if convErr != nil {
-		return fmt.Errorf("invalid backoff configuration, %w", convErr)
-	}
-
-	// Perform retry
-	_ = wait.ExponentialBackoff(*b, func() (bool, error) {
-		if err = f(); err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
-
 	if err != nil {
 		return fmt.Errorf("failed after retries: %w", err)
 	}
